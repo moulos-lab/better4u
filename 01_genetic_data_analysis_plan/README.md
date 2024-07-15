@@ -29,6 +29,7 @@ The tools below will be needed for the proper execution of the analysis plan.
 The tools will also be distributed as Docker/Singularity images.
 
 * [bcftools 1.20](https://samtools.github.io/bcftools/) - [download](https://github.com/samtools/bcftools/releases/download/1.20/bcftools-1.20.tar.bz2) - [manual](https://samtools.github.io/bcftools/bcftools.html)
+* [htslib 1.20](https://www.htslib.org/) - [download](https://github.com/samtools/htslib/releases/download/1.20/htslib-1.20.tar.bz2) - [manual](https://www.htslib.org/doc/bgzip.html)
 * [PLINK 1.90](https://www.cog-genomics.org/plink/) - [download](https://s3.amazonaws.com/plink1-assets/plink_linux_x86_64_20231211.zip) - [manual](https://www.cog-genomics.org/plink/1.9/index)
 
 # 0. Pre-imputation
@@ -309,9 +310,51 @@ Principal Component Analysis
 
 # 1. Post-imputation
 
+The HRC r1.1. 2016 reference panel is well preprocessed, therefore the output
+VCF files do not contain variant duplicates and do not contain multi-allelics.
+Therefore, their conversion to PLINK after imputation score filtering is more
+strightforward. The following assume that the VCF files are named as they are
+delivered by the Michigan Imputation Server, i.e. `chr{1..22}.dose.vcf.gz`.
 
+## 1.1 Poorly imputed variant filtering and conversion to PLINK
 
+In the following, we exclude imputed variants with imputation score 
+(R<sup>2</sup) less than 0.3. This is done in parallel (per chromosome) where
+possible:
 
+```
+for CHR in `seq 1 22`
+do
+  bcftools filter \
+    --exclude 'INFO/R2<0.3' \
+    --output-type z \
+    --output chr${CHR}_filtered.dose.vcf.gz \
+    chr${CHR}.dose.vcf.gz &
+done
+```
+
+Subsequently, we concatenate the VCF files in preparation for conversion to
+PLINK format for the rest of the filtering as well as PCA operations. We assume
+that the concatenated VCF file is called `COHORT_imputed.vcf.gz`:
+
+```
+bcftools concat \
+  --output-type z \
+  --output COHORT_imputed.vcf.gz \
+  chr{1..22}_filtered.dose.vcf.gz
+```
+
+Finally, we convert to PLINK:
+
+```
+plink --vcf COHORT_imputed.vcf.gz --make-bed --out COHORT_imputed
+```
+
+## 1.2 Post-imputation QC with PLINK
+
+We follow most steps performed in the pre-imputation QC. specifically:
+
+WIP
 
 ## Notes
 
