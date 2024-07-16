@@ -307,6 +307,11 @@ Principal Component Analysis
 
 *WIP*
 
+## 0.3 Cleanup (optional)
+
+```
+rm COHORT_ibd* *prune* COHORT_tmp* 
+```
 
 # 1. Post-imputation
 
@@ -352,9 +357,102 @@ plink --vcf COHORT_imputed.vcf.gz --make-bed --out COHORT_imputed
 
 ## 1.2 Post-imputation QC with PLINK
 
-We follow most steps performed in the pre-imputation QC. specifically:
+We follow most steps performed in the pre-imputation QC, specifically:
 
-WIP
+For variant filters:
+
+1. Variant call rate: >98%
+2. Minor Allele Frequency: >0.05 (this should also exclude monomorphic variants)
+3. Hardy-Weinberg equilibrium: >10<sup>-6</sup>
+
+For sample filters:
+
+1. Sample call rate: > 95%
+2. Heterozygosity: median(heterozygosity) +/- 3 x IQR
+3. Removal of possible gender mismatches
+4. PCA: outlier removal
+
+As in pre-imputation. we sequentially apply variant and sample filters.
+
+First, we calculate heterozygosities:
+
+```
+plink \
+  --bfile COHORT_imputed \
+  --out COHORT_imputed --het
+```
+
+Then, we create a file with sample names with heterozygosities within the limits
+of our filter (sample filter #2 above):
+
+```
+Rscript \
+  -e '{
+    hetData <- read.table("COHORT_imputed.het",header=TRUE,check.names=FALSE)
+    rownames(hetData) <- hetData$IID
+    heterozygosity <- 1 - hetData[,3]/hetData[,5]
+    names(heterozygosity) <- rownames(hetData)
+    avg <- median(heterozygosity,na.rm=TRUE)
+    dev <- IQR(heterozygosity,na.rm=TRUE)
+    keep <- heterozygosity > avg - 3*dev & heterozygosity < avg + 3*dev
+    goodHet <- rownames(hetData)[keep]
+    write.table(hetData[keep,c("FID","IID"),drop=FALSE],
+      file="het_samples_ipass.txt",col.names=FALSE,row.names=FALSE,quote=FALSE)
+  }'
+```
+
+The file `het_samples_ipass.txt` will be used after the next filters to compile 
+a final list of samples to be kept in later analysis.
+
+The following `plink` command will apply variant filters #1,2,3 and sample 
+filter #1:
+
+```
+plink \
+  --bfile COHORT_imputed \
+  --out COHORT_imputed_tmp \
+  --make-bed \
+  --geno 0.02 \
+  --maf 0.05 \
+  --hwe 0.000001 \
+  --mind 0.05
+```
+
+We now create files with variants and samples to *keep* (samples to keep are 
+merged with those passing heterozygosity filters):
+
+```
+cut -d" " -f1-2 COHORT_imputed_tmp.fam > generic_samples_ipass.txt
+cut -f2 COHORT_imputed_tmp.bim > generic_variants_ipass.txt
+
+Rscript \
+  -e '{
+    het <- read.table("het_samples_ipass.txt")
+    rownames(het) <- het[,2]
+    gen <- read.table("generic_samples_ipass.txt")
+    rownames(gen) <- gen[,2]
+    pass <- intersect(rownames(het),rownames(gen))
+    write.table(gen[pass,,drop=FALSE],file="all_samples_ipass.txt",
+      col.names=FALSE,row.names=FALSE,quote=FALSE)
+  }'
+```
+
+Create PLINK files ready for PCA:
+
+```
+plink \
+  --bfile COHORT_imputed \
+  --out COHORT_imputed_filtered \
+  --extract generic_variants_ipass.txt \
+  --keep all_samples_ipass.txt \
+  --make-bed
+```
+
+
+Principal Component Analysis
+
+*WIP*
+
 
 ## Notes
 
