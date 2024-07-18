@@ -1,5 +1,77 @@
-Draft BETTER4U analysis plan
+First Analysis Plan for Genetic Data - WP3
 ================================================================================
+
+# Introduction
+
+For the start of WP3 of BETTER4U, we will perform genome-wide association 
+analyses for body weight and Body Mass Index (BMI). This document focuses on 
+tasks **3.2** (*Database of harmonized GWAS summary statistics from consortium
+cohorts and publicly available sources*) and **3.4** (*Database of genetic
+variants affecting variation in BMI and associated traits, including a list of
+genetic loci with pleiotropic effects*). Each individual study will perform data
+quality control (QC) and analysis and provide summary results for meta-analysis.
+Results files will be deposited to a central repository where additional QC and
+the meta-analysis will be performed.
+
+If you have any questions, please email all the following individuals: 
+
+* Jon Anders Eriksson (anders.eriksson@ut.ee)
+* Nana Kalafati (nkalafati@gmail.com)
+* Panagiotis Moulos (moulos@fleming.gr)
+* ...Others
+
+
+**TIMELINE FOR COMPLETION OF COHORT-SPECIFIC ANALYSES** 
+Please submit first results by **MM/DD/2024**
+
+Before starting the analysis, please make sure that:
+
+1. Imputation of genotypes is performed using the HRC r1.1. 2016 reference 
+panel. In case your data have not been imputed to this panel yet, please 
+proceed as soon as possible.
+2. All genotypes are on the correct human genome version build (GRCh37/hg19) and 
+on the correct strand (forward). If having used a public imputation server for
+HRC r.1.1. 2016, this should hold true.  
+3.  Files with genotypic data (arrays/imputed/WGS) are in [VCF](https://samtools.github.io/hts-specs/VCFv4.2.pdf) format.
+4. Phenotypic variables are coded based on the [BETTER4U codebook](#).
+
+## Overview 
+
+There are six major components to the WP3 analysis plan: 
+
+1. In this analysis plan, genetic data along with a limited set of variables 
+from each cohort will be used to conduct association analyses, namely age, sex, 
+body weight and BMI. 
+2. Analyses will include both sexes and all age groups. However, analyses will 
+be performed separately for individuals over and under 18yrs old, as well as for
+males and females.
+3. Analyses will not include sex chromosomes (chrX, chrY) or mitochondrial DNA 
+(chrM/MT).
+4. In studies with more than one measurement points, we ask that you perform the
+cross-sectional analyses for each one of your cohort’s measurement points.
+5. Template scripts in R will be provided within the [GitHub repository](#) 
+linked to project overview XXX. Sharing your work here is highly appreciated. 
+These environments are private, so please share your github ID with XXX (XXX).
+6. Meta-analysis of the results will be led by the UTARTU team using the 
+[MR-MEGA](https://genomics.ut.ee/en/tools#:~:text=Instructions-,MR%2DMEGA,-Introduction) software and methodology. 
+
+## Considerations
+
+Due to the cohorts’ diversity in measurements, we would like to ask for the 
+analysts to only include data measured using the following measurement units:
+1. For BMI, please use kg/m<sup>2</sup> and two decimals (e.g. `23.87`). For BMI
+in children and adolescents, please replace BMI with zBMI. You will find 
+attached the relevant syntax for calculating zBMI based on 
+[Cole and Lobstein et al., 2012](https://pubmed.ncbi.nlm.nih.gov/22715120/) in 
+the XXX script. 
+2. For weight, please use as unit kg with two decimals. Only perform analyses in
+the sample of age greater than 18 years old.
+3. For height, please use as unit m in two decimals. Only perform analyses in 
+the sample of age greater than 18 years.
+4. For sex, please use the code: 1=man, 2=woman.
+
+
+We thank you for your cooperation.
 
 # Requirements
 
@@ -28,9 +100,15 @@ responsibility of each partner. We may use a sample structure herein.
 The tools below will be needed for the proper execution of the analysis plan.
 The tools will also be distributed as Docker/Singularity images.
 
-* [bcftools 1.20](https://samtools.github.io/bcftools/) - [download](https://github.com/samtools/bcftools/releases/download/1.20/bcftools-1.20.tar.bz2) - [manual](https://samtools.github.io/bcftools/bcftools.html)
-* [htslib 1.20](https://www.htslib.org/) - [download](https://github.com/samtools/htslib/releases/download/1.20/htslib-1.20.tar.bz2) - [manual](https://www.htslib.org/doc/bgzip.html)
-* [PLINK 1.90](https://www.cog-genomics.org/plink/) - [download](https://s3.amazonaws.com/plink1-assets/plink_linux_x86_64_20231211.zip) - [manual](https://www.cog-genomics.org/plink/1.9/index)
+|Tool|Version|Webpage|Download|
+|:----|:----|:----|:----|
+|bcftools|1.20|[https://www.htslib.org](https://www.htslib.org)|[download](https://github.com/samtools/bcftools/releases/download/1.20/bcftools-1.20.tar.bz2)|
+|htslib|1.20|[https://www.htslib.org](https://www.htslib.org)|[download](https://github.com/samtools/htslib/releases/download/1.20/htslib-1.20.tar.bz2)|
+|VCFtools|0.1.16|[https://vcftools.github.io/](https://vcftools.github.io/)|[download](https://github.com/vcftools/vcftools/releases/download/v0.1.16/vcftools-0.1.16.tar.gz)|
+|PLINK|1.90|[https://www.cog-genomics.org/plink/](https://www.cog-genomics.org/plink/)|[download](https://s3.amazonaws.com/plink1-assets/plink_linux_x86_64_20231211.zip)|
+|REGENIE|3.5|[https://rgcgithub.github.io/regenie/](https://rgcgithub.github.io/regenie/)|[download](https://github.com/rgcgithub/regenie/releases/download/v3.5/regenie_v3.5.gz_x86_64_Linux.zip)|
+|GCTA|1.94.1|[https://yanglab.westlake.edu.cn/software/gcta/](https://yanglab.westlake.edu.cn/software/gcta/)|[download](https://yanglab.westlake.edu.cn/software/gcta/bin/gcta-1.94.1-linux-kernel-3-x86_64.zip)|
+|MR-MEGA|0.2|[https://genomics.ut.ee/en/tools](https://genomics.ut.ee/en/tools)|[download](https://tools.gi.ut.ee/tools/MR-MEGA_v0.2.zip)|
 
 # 0. Pre-imputation
 
