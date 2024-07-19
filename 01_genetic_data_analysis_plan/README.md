@@ -58,7 +58,7 @@ These environments are private, so please share your github ID with XXX (XXX).
 
 ## Considerations
 
-Due to the cohorts’ diversity in measurements, we would like to ask for the 
+Due to the cohorts' diversity in measurements, we would like to ask for the 
 analysts to only include data measured using the following measurement units:
 1. For BMI, please use kg/m<sup>2</sup> and two decimals (e.g. `23.87`). For BMI
 in children and adolescents, please replace BMI with zBMI. You will find 
@@ -543,7 +543,7 @@ following samples should also be excluded from any analyses:
 condition that significantly alters normal body weight will be excluded.
 
 **IMPORTANT**: Analyses will take place separately for children/adolescents <18 
-years old and adults of ≥18 years old.
+years old and adults older than 18 years old.
 
 
 # 2. Genome-wide association analyses
@@ -570,7 +570,7 @@ $$ BMI(t) = age(t) + age(t)^2 + sex + \sum_{i=1}^n PC_i + OtherCohortSpecificCov
 
 2.
 
-$$ ΔBMI(t) = Δage(t) + sex + \sum_{i=1}^n PC_i + OtherCohortSpecificCovariates $$
+$$ \Delta BMI(t) = \Delta age(t) + sex + \sum_{i=1}^n PC_i + OtherCohortSpecificCovariates $$
 
 3.
 
