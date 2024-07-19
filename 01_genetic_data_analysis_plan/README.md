@@ -564,12 +564,19 @@ models.
 
 The following analyses will take place:
 
-1. $$ BMI(t) = age(t)+age(t)^2 + sex + \sum_{i=1}^n PC_i
+1.
 
-(i) BMI(t)= age(t)+age(t)2+ sex+PC1+…PCn + other cohort-specific covariates as needed
-(ii)    ΔBMI= Δage+ sex+PC1+…PCn + other cohort-specific covariates as needed
-(iii)   Body weight(t)= age(t)+age(t)2+ sex+PC1+…PCn + other cohort-specific covariates as needed
-(iv)    …
+$$ BMI(t) = age(t) + age(t)^2 + sex + \sum_{i=1}^n PC_i + OtherCohortSpecificCovariates $$
+
+2.
+
+$$ ΔBMI(t) = Δage(t) + sex + \sum_{i=1}^n PC_i + OtherCohortSpecificCovariates $$
+
+3.
+
+$$ BodyWeight(t) = age(t) + age(t)^2 + sex + \sum_{i=1}^n PC_i + OtherCohortSpecificCovariates $$
+
+4. Others *WIP*
 
 ## 2.2 Analysis with REGENIE
 
