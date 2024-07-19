@@ -22,6 +22,7 @@ If you have any questions, please email all the following individuals:
 
 
 **TIMELINE FOR COMPLETION OF COHORT-SPECIFIC ANALYSES** 
+
 Please submit first results by **MM/DD/2024**
 
 Before starting the analysis, please make sure that:
@@ -131,7 +132,7 @@ respected.
 ### 0.1.1 Data are in **proper** VCF format
 
 The **proper** VCF specification can be found [here](https://samtools.github.io/hts-specs/VCFv4.2.pdf).
-Note that `REF` **must** correspond to the *reference* allele in the genoe and 
+Note that `REF` **must** correspond to the *reference* allele in the genome and 
 `ALT` to the *alternative* allele, irrespectively of allele frequencies in the
 population. VCF file(s) must also be indexed. If not:
 
@@ -175,13 +176,13 @@ myiidn
 Separate IIDs/FIDs
 
 ```
-myiid1_myfid1
-myiid2_myfid1
-myiid3_myfid1
-myiid4_myfid2
-myiid5_myfid2
+myfid1_myiid1
+myfid2_myiid1
+myfid3_myiid1
+myfid4_myiid2
+myfid5_myiid2
 ...
-myiidn_myfidn
+myfidn_myiidn
 ```
 
 The file should be called `new_sample_names.txt`. Then, `bcftools reheader` 
@@ -252,7 +253,7 @@ The following variant filters are recommended:
 The following sample filters are recommended:
 
 1. Sample call rate: > 95%
-2. Heterozygosity: median(heterozygosity) +/- 3IQR
+2. Heterozygosity: median(heterozygosity) &plusmn; 3 &times; IQR
 3. Identity By Descent: > 0.5
 4. PCA: outlier removal
 
@@ -381,7 +382,7 @@ plink \
   --make-bed
 ```
 
-Principal Component Analysis
+Principal Component Analysis (optional)
 
 *WIP*
 
@@ -446,7 +447,7 @@ For variant filters:
 For sample filters:
 
 1. Sample call rate: > 95%
-2. Heterozygosity: median(heterozygosity) +/- 3 x IQR
+2. Heterozygosity: median(heterozygosity) &plusmn; 3 &times; IQR
 3. Removal of possible gender mismatches
 4. PCA: outlier removal
 
@@ -531,9 +532,175 @@ Principal Component Analysis
 
 *WIP*
 
+## 1.3 Non-genetic related sample exclusions
+
+Individuals of all age groups will be included in the analyses. However, the
+following samples should also be excluded from any analyses:
+
+- Outliers (based on 5 &times; SD) for any trait will be excluded.
+- Known Mendelian cases of obesity will be excluded.
+- Pregnant women and individuals with any other acute or chronic clinical 
+condition that significantly alters normal body weight will be excluded.
+
+**IMPORTANT**: Analyses will take place separately for children/adolescents <18 
+years old and adults of ≥18 years old.
+
+
+# 2. Genome-wide association analyses
+
+## 2.1 General
+
+Please use the XXX script to perform the genome-wide association analyses 
+required herein. 
+
+* An additive model of inheritance will be assumed.
+* In case you have a case-control study, and the disease phenotype is associated 
+with anthropometric data, please make sure you run the analysis separately for 
+cases and controls.
+* In case of a family study or cryptic relatedness, please include a kinship 
+matrix in your analysis using XXX.
+* Any other cohort-specific covariates should be included as covariates in the 
+models.
+
+The following analyses will take place:
+
+1. $$ BMI(t) = age(t)+age(t)^2 + sex + \sum_{i=1}^n PC_i
+
+(i) BMI(t)= age(t)+age(t)2+ sex+PC1+…PCn + other cohort-specific covariates as needed
+(ii)    ΔBMI= Δage+ sex+PC1+…PCn + other cohort-specific covariates as needed
+(iii)   Body weight(t)= age(t)+age(t)2+ sex+PC1+…PCn + other cohort-specific covariates as needed
+(iv)    …
+
+## 2.2 Analysis with REGENIE
+
+## 2.2.1 Preparation of covariate and phenotype files
+
+The covariate files should include covariates for each analysis mentioned above
+plus the PCs. Based on the accompanying toy dataset from HUA, we provide an
+example for case (i).
+
+For the covariate file, we need the phenotypes as well as the PCs. The PCs will
+be provided by the CAT. For this example, we calculate 10 PCs with PLINK.
+
+Firstly, perform pruning (will be done based on the reference panel for the
+canonical analysis):
+
+```
+plink \
+  --bfile toy \
+  --out toy \
+  --indep-pairwise 50 5 0.2
+```
+
+Then, calculate 10 PCs exluding the pruned SNPs:
+
+```
+plink \
+  --bfile toy \
+  --out toy \
+  --pca 10 header \
+  --exclude toy.prune.out
+```
+
+The output is written to `toy.eigenvec`. We then construct the covariates and
+phenotype file:
+
+```
+Rscript \
+  -e '{
+    # Read all phenotypes
+    phen <- read.delim("toy.txt")
+    
+    # Construct 1st part of covariates files
+    rownames(phen) <- phen$iid
+    phen$age2 <- phen$age^2
+    covs <- data.frame(
+      FID=phen$fid,
+      IID=phen$iid,
+      sex=phen$sex,
+      age=phen$age,
+      age2=phen$age2
+    )
+    
+    # 2nd part - PCs
+    pcs <- read.table("toy.eigenvec",header=TRUE)
+    rownames(pcs) <- pcs$IID
+    pcs <- pcs[rownames(phen),]
+    pcs <- pcs[,grep("PC",colnames(pcs))]
+    covs <- cbind(covs,pcs)
+    
+    # Write the covariates file
+    write.table(covs,file="toy_regenie_covariates.txt",row.names=FALSE,
+        quote=FALSE)
+    
+    # Construct the phenotype file
+    resp <- data.frame(
+      FID=phen$fid,
+      IID=phen$iid,
+      bmi=phen$bmi_b
+    )
+    write.table(resp,file="toy_regenie_phenotype.txt",row.names=FALSE,
+        quote=FALSE)
+  }'
+```
+
+**NOTE**: We just put the `bmi_b` variable in the phenotype file, however, we
+could have put all the variables of interest for multi-trait analysis since
+`regenie` supports it.
+
+## 2.2.2 Execute REGENIE with the toy dataset
+
+Step 0: exclude monomorphic and low variance SNPs from the toy dataset as they
+cause `regenie` to crash. Generally, QC **must** be performed prior to running
+`regenie`:
+
+```
+plink \
+  --bfile toy \
+  --out toyf \
+  --make-bed \
+  --maf 0.01
+```
+
+Step 1:
+
+```
+regenie \
+  --step 1 \
+  --bed toyf \
+  --covarFile toy_regenie_covariates.txt \
+  --phenoFile toy_regenie_phenotype.txt \
+  --bsize 100 \
+  --out fit_bmi_out
+```
+
+Step 2:
+
+```
+regenie \
+  --step 2 \
+  --bed toyf \
+  --covarFile toy_regenie_covariates.txt \
+  --phenoFile toy_regenie_phenotype.txt \
+  --bsize 200 \
+  --pThresh 0.05 \
+  --pred fit_bmi_out_pred.list \
+  --ignore-pred \
+  --out test_bmi_out_firth
+```
+
+The summary statistics are in `test_bmi_out_firth_bmi.regenie`.
+
+**NOTE**: 
+
+1. All the parameters will be present in the final analysis plan and decided by
+the CAT.
+2. We used `--ignore-pred` here because our sample for Step 1 is too small to 
+produce whole genome predictions required by `regenie`. It should **not** be the
+case with real data.
 
 ## Notes
 
 If multicore, use `&`
 Consider using `nohup`
-
+[How to use inverse normal transformation of residuals](https://www.biostars.org/p/312945/)
