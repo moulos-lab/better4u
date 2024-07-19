@@ -1,0 +1,26 @@
+tool	version	page	link
+bcftools	1.20	https://www.htslib.org	https://github.com/samtools/bcftools/releases/download/1.20/bcftools-1.20.tar.bz2
+htslib	1.20	https://www.htslib.org	https://github.com/samtools/htslib/releases/download/1.20/htslib-1.20.tar.bz2
+VCFtools	0.1.16	https://vcftools.github.io/	https://github.com/vcftools/vcftools/releases/download/v0.1.16/vcftools-0.1.16.tar.gz
+PLINK	1.90	https://www.cog-genomics.org/plink/	https://s3.amazonaws.com/plink1-assets/plink_linux_x86_64_20231211.zip
+REGENIE	3.5	https://rgcgithub.github.io/regenie/	https://github.com/rgcgithub/regenie/releases/download/v3.5/regenie_v3.5.gz_x86_64_Linux.zip
+GCTA	1.94.1	https://yanglab.westlake.edu.cn/software/gcta/	https://yanglab.westlake.edu.cn/software/gcta/bin/gcta-1.94.1-linux-kernel-3-x86_64.zip
+SNPTEST	2.5.6	https://www.chg.ox.ac.uk/~gav/snptest/	http://www.well.ox.ac.uk/~gav/resources/snptest_v2.5.6_CentOS_Linux7.8-x86_64_dynamic.tgz
+PRSice2	2.3.5	https://choishingwan.github.io/PRSice/	https://github.com/choishingwan/PRSice/releases/download/2.3.5/PRSice_linux.zip
+			
+R package	version	official	comment
+susieR	latest, note it as comment in Dockerfile	yes	
+snpStats	latest, note it as comment in Dockerfile	yes	
+parallel	latest, note it as comment in Dockerfile	yes	
+utils	latest, note it as comment in Dockerfile	yes	
+remotes	latest, note it as comment in Dockerfile	yes	
+R.utils	latest, note it as comment in Dockerfile	yes	
+statgenGWAS	latest, note it as comment in Dockerfile	yes	
+rmarkdown	latest, note it as comment in Dockerfile	yes	
+SAIGE	latest, note it as comment in Dockerfile	no	https://saigegit.github.io/SAIGE-doc/ https://github.com/saigegit/SAIGE/blob/main/docker/Dockerfile
+lassosum	latest, note it as comment in Dockerfile	no	https://github.com/tshmak/lassosum
+			
+			
+ggplot2			
+data.table			
+optparse			
