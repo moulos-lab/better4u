@@ -41,7 +41,10 @@ for (pkg in other_packages) {
 
 # Write the list to the file in R Markdown table format
 writeLines(
-  c(
+  c("```{r setup, include=FALSE}",
+	"knitr::opts_chunk$set(echo = FALSE)",
+	"```",
+	"",
     "## User-defined Packages",
     "",
     "```{r}",
@@ -80,3 +83,6 @@ writeLines(
   ),
   rmd_output_file
 )
+
+# Knit the document to an HTML file
+rmarkdown::render(rmd_output_file, output_format = "html_document")
