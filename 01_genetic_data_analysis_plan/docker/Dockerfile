@@ -160,13 +160,11 @@ RUN apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 # ## Example Commands for Tools
 # ### BCFTools
-# To view a VCF file with BCFTools:
 # ```bash
-# docker exec better4u bcftools view example.vcf
+# docker exec better4u bcftools --help
 # ```
 
 # ### VCFtools
-# Get basic file statistics
 # ```bash
 # docker exec better4u vcftools --help
 # ```
@@ -174,7 +172,7 @@ RUN apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 # ### PRSice2
 # Do not change the first line add additional arguments like `--help`
 # ```bash
-# docker exec better4u PRSice.R --prsice $(which PRSice_linux) \
+# docker exec better4u PRSice.R --prsice /tools/prsice/PRSice_linux \
 #     --help
 # ```
 
