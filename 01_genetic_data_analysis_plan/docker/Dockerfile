@@ -125,9 +125,6 @@ RUN chmod +x /usr/local/bin/entrypoint.sh
 # Define the entrypoint
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 
-# # What to do by default
-# CMD ["bash"]
-
 # Clean up APT when done
 RUN apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
@@ -142,67 +139,48 @@ RUN apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 # docker build -t better4u ./
 # ```
 
-# ## Usage Example
-# ### Create the Container
-# Run the container with no external network connectivity (`--network none`)
-# ```bash
-# docker run -t -d --name better4u -v /path/to/project/dir:/app --network none better4u
-# ```
-
-# ### Start the Container
-# If the container is stopped, start it again
-# ```bash
-# docker start better4u
-# ```
-
-# ### Execute Commands in the Running Container
-# To execute commands inside the running container (see examples below):
-# ```bash
-# docker exec better4u <COMMAND>
-# ```
-
-# ### Stop the Container
-# Stop the container when you're done
-# ```bash
-# docker stop better4u
-# ```
-
-# ## Example Commands for Tools
+# ## Usage Examples
 # ### BCFTools
 # ```bash
-# docker exec better4u bcftools --help
+# docker run -t --rm --network none -v /path/to/project/dir:/app better4u \
+#   bcftools --help
 # ```
 
 # ### VCFtools
 # ```bash
-# docker exec better4u vcftools --help
+# docker run -t --rm --network none -v /path/to/project/dir:/app better4u \
+#   vcftools --help
 # ```
 
 # ### PRSice2
 # Do not change the first line add additional arguments like `--help`
 # ```bash
-# docker exec better4u PRSice.R --prsice /tools/prsice/PRSice_linux \
-#     --help
+# docker run -t --rm --network none -v /path/to/project/dir:/app better4u \
+#   PRSice.R --prsice /tools/prsice/PRSice_linux --help
 # ```
 
 # ### PLINK
 # ```bash
-# docker exec better4u plink --help
+# docker run -t --rm --network none -v /path/to/project/dir:/app better4u \
+#   plink --help
 # ```
 
 # ### REGENIE
 # ```bash
-# docker exec better4u regenie --help
+# docker run -t --rm --network none -v /path/to/project/dir:/app better4u \
+#   regenie --help
 # ```
 
 # ### GCTA
 # ```bash
-# docker exec better4u gcta64
+# docker run -t --rm --network none -v /path/to/project/dir:/app better4u \
+#   gcta64
 # ```
 
 # ### SNPTEST
 # ```bash
-# docker exec better4u snptest -help
+# docker run -t --rm --network none -v /path/to/project/dir:/app better4u \
+#   snptest -help
 # ```
 
 # ## Tool Versions
