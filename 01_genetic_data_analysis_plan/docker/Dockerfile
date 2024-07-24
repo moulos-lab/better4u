@@ -116,8 +116,17 @@ RUN apt-get -y update && apt-get install -y -q \
 # Set working directory
 WORKDIR /app
 
-# What to do by default
-CMD ["bash"]
+# Copy entrypoint script
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+
+# Make entrypoint script executable
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
+# Define the entrypoint
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+
+# # What to do by default
+# CMD ["bash"]
 
 # Clean up APT when done
 RUN apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
