@@ -4,7 +4,7 @@
 pack_vers <- installed.packages()[,"Version"]
 
 # Specify the output files
-rmd_output_file <- "r_package_list.Rmd"
+md_output_file <- "r_package_list.md"
 tsv_output_file <- "r_package_list.tsv"
 
 # Convert the named character list to a data frame
@@ -39,50 +39,41 @@ for (pkg in other_packages) {
   other_pack_vers[pkg] <- pack_vers[pkg]
 }
 
-# Write the list to the file in R Markdown table format
-writeLines(
-  c("```{r setup, include=FALSE}",
-	"knitr::opts_chunk$set(echo = FALSE)",
-	"```",
-	"",
-    "## User-defined Packages",
-    "",
-    "```{r}",
-    "user_defined_pack_vers <- c(",
-    paste(
-      sprintf("  %s = \"%s\"", names(user_defined_pack_vers), user_defined_pack_vers),
-      collapse = ",\n"
-    ),
-    ")",
-    "```",
-    "",
-    "Package | Version",
-    "--- | ---",
-    paste(
-      sprintf("%s | %s", names(user_defined_pack_vers), user_defined_pack_vers),
-      collapse = "\n"
-    ),
-    "",
-    "## Other Packages",
-    "",
-    "```{r}",
-    "other_pack_vers <- c(",
-    paste(
-      sprintf("  %s = \"%s\"", names(other_pack_vers), other_pack_vers),
-      collapse = ",\n"
-    ),
-    ")",
-    "```",
-    "",
-    "Package | Version",
-    "--- | ---",
-    paste(
-      sprintf("%s | %s", names(other_pack_vers), other_pack_vers),
-      collapse = "\n"
-    )
-  ),
-  rmd_output_file
-)
+# Helper function to format table with dynamic column widths
+format_table <- function(pkg_list) {
+  max_length <- max(nchar(names(pkg_list)))
+  fmt <- sprintf("%%-%ds | %%s\n", max_length)
+  
+  table <- sprintf(fmt, "Package", "Version")
+  separator <- sprintf(fmt, strrep("-", max_length), strrep("-", 10))
+  table <- paste0(table, separator, sep = "")
+  
+  for (pkg in names(pkg_list)) {
+    table <- paste0(table, sprintf(fmt, pkg, pkg_list[pkg]), sep = "")
+  }
+  
+  table
+}
 
-# Knit the document to an HTML file
-rmarkdown::render(rmd_output_file, output_format = "html_document")
+# Create Markdown content
+create_markdown <- function(user_defined, other_packages, file_name) {
+  # Create user-defined packages section
+  user_defined_markdown <- "
+## User-defined Packages
+
+"
+  user_defined_markdown <- paste0(user_defined_markdown, format_table(user_defined))
+  
+  # Create other packages section
+  other_markdown <- "
+## Other Packages
+
+"
+  other_markdown <- paste0(other_markdown, format_table(other_packages))
+  
+  # Write to file
+  writeLines(c(user_defined_markdown, other_markdown), con = file_name)
+}
+
+# Create the Markdown file
+create_markdown(user_defined_pack_vers, other_pack_vers, md_output_file)
