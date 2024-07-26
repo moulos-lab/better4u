@@ -1,12 +1,15 @@
-FROM phusion/baseimage:jammy-1.0.4 as base
+FROM phusion/baseimage:jammy-1.0.4 AS base
 
 LABEL author="Stelios GKIONIS <gkionis@fleming.gr>"
 
 # Use baseimage-docker's init system.
 CMD ["/sbin/my_init"]
 
+# Make frontend noninteractive for setup
+ENV DEBIAN_FRONTEND=noninteractive
+
 # Install apt-get dependencies for command line tools
-RUN DEBIAN_FRONTEND=noninteractive apt-get -y update && apt-get install -y -q \
+RUN apt-get update && apt-get install -y -q \
     gcc zlib1g-dev libbz2-dev liblzma-dev g++ make pkg-config \
     wget zip unzip lbzip2 software-properties-common dirmngr
 
@@ -85,7 +88,7 @@ ENV PATH=/tools/prsice:$PATH
 WORKDIR /tools
 
 # Install R
-RUN DEBIAN_FRONTEND=noninteractive wget -qO- https://cloud.r-project.org/bin/linux/ubuntu/marutter_pubkey.asc | \
+RUN wget -qO- https://cloud.r-project.org/bin/linux/ubuntu/marutter_pubkey.asc | \
     tee -a /etc/apt/trusted.gpg.d/cran_ubuntu_key.asc && \
     add-apt-repository "deb https://cloud.r-project.org/bin/linux/ubuntu $(lsb_release -cs)-cran40/" && \
     apt-get -y update && apt-get install -y -q r-base
@@ -97,7 +100,7 @@ RUN R -e "install.packages(c('susieR', 'parallel', 'utils', 'remotes', \
     R -e "library(BiocManager); BiocManager::install('snpStats')"
 
 # Install dependencies and SAIGE
-RUN apt-get -y update && apt-get install -y -q \
+RUN apt-get update && apt-get install -y -q \
     cmake git pip file libfontconfig1-dev libharfbuzz-dev libfribidi-dev \
     libcurl4-openssl-dev libssl-dev libxml2-dev libfreetype6-dev libpng-dev \
     libtiff5-dev libjpeg-dev libmariadb-dev libpq-dev && \
@@ -113,11 +116,14 @@ RUN apt-get -y update && apt-get install -y -q \
     chmod +x /tools/SAIGE/extdata/step* && \
     cp /tools/SAIGE/extdata/step* /usr/local/bin/
 
+# Reset frontend to default
+ENV DEBIAN_FRONTEND=teletype
+
 # Set working directory
 WORKDIR /app
 
-# What to do by default
-CMD ["bash"]
+# # What to do by default
+# CMD ["bash"]
 
 # Clean up APT when done
 RUN apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
