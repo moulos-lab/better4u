@@ -2,8 +2,8 @@ FROM phusion/baseimage:jammy-1.0.4 AS base
 
 LABEL author="Stelios GKIONIS <gkionis@fleming.gr>"
 
-# Use baseimage-docker's init system.
-CMD ["/sbin/my_init"]
+# # baseimage-docker's init system cannot be used with Apptainer.
+# ENTRYPOINT ["/sbin/my_init"]
 
 # Make frontend noninteractive for setup
 ENV DEBIAN_FRONTEND=noninteractive
@@ -119,86 +119,114 @@ RUN apt-get update && apt-get install -y -q \
 # Reset frontend to default
 ENV DEBIAN_FRONTEND=teletype
 
-# Set working directory
+# Set working directory for Docker
 WORKDIR /app
 
-# # What to do by default
-# CMD ["bash"]
+# What to do by default
+CMD ["bash"]
 
 # Clean up APT when done
 RUN apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 
 # =============================================================================
-# Docker Container Instructions
+# Container Instructions
 # =============================================================================
 
+# # Apptainer
 # ## Build Instructions
-# Build the Docker image with a custom tag
+# Build the Apptainer image at the specified location, from the Docker image (see below).
+# For convenience put it in the project dir.
+# ```bash
+# apptainer build ./better4u.sif docker-daemon:better4u:latest 
+# ```
+
+# ## Usage Example
+# ### Create the Container
+# Run the container with no external network connectivity with `--net --network none`
+# from the project dir so it is mounted automatically.
+# ```bash
+# apptainer run --net --network none path/to/better4u.sif
+# ```
+
+# ### Execute Commands in the Running Container
+# Simply run commands as you would in any interactive shell and exit when finished.
+
+# # Docker
+# ## Build Instructions
+# Build the Docker image with a custom tag specified by `-t`.
 # ```bash
 # docker build -t better4u ./
 # ```
 
 # ## Usage Example
 # ### Create the Container
-# Run the container with no external network connectivity (`--network none`)
+# Run the container with no external network connectivity with `--network none`.
 # ```bash
 # docker run -t -d --name better4u -v /path/to/project/dir:/app --network none better4u
 # ```
 
 # ### Start the Container
-# If the container is stopped, start it again
+# If the container is stopped, start it again.
 # ```bash
 # docker start better4u
 # ```
 
 # ### Execute Commands in the Running Container
-# To execute commands inside the running container (see examples below):
+# See tool-specific examples below:
 # ```bash
 # docker exec better4u <COMMAND>
 # ```
 
 # ### Stop the Container
-# Stop the container when you're done
+# Stop the container when you're done.
 # ```bash
 # docker stop better4u
 # ```
 
-# ## Example Commands for Tools
+# # Example Commands for Tools
+# Commands are given for Apptainer in the first line, then for Docker.
 # ### BCFTools
 # ```bash
+# bcftools --help
 # docker exec better4u bcftools --help
 # ```
 
 # ### VCFtools
 # ```bash
+# vcftools --help
 # docker exec better4u vcftools --help
 # ```
 
 # ### PRSice2
-# Do not change the first line add additional arguments like `--help`
+# Do not change `--prsice`, add additional arguments after, like `--help`.
 # ```bash
+# PRSice.R --prsice $(PRSice_linux) --help
 # docker exec better4u PRSice.R --prsice /tools/prsice/PRSice_linux \
 #     --help
 # ```
 
 # ### PLINK
 # ```bash
+# plink --help
 # docker exec better4u plink --help
 # ```
 
 # ### REGENIE
 # ```bash
+# regenie --help
 # docker exec better4u regenie --help
 # ```
 
 # ### GCTA
 # ```bash
+# gcta64
 # docker exec better4u gcta64
 # ```
 
 # ### SNPTEST
 # ```bash
+# snptest -help
 # docker exec better4u snptest -help
 # ```
 
