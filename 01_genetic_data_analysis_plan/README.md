@@ -149,8 +149,9 @@ do
 done
 ```
 
-If the data are split per chromosome, a genome-wide VCF file should be created
-in order to proceed with PLINK filtering:
+If the data are split per chromosome and you wish to perform the analysis
+genome-wide, a genome-wide VCF file should be created in order to proceed with 
+PLINK filtering:
 
 ```
 bcftools concat \
@@ -188,6 +189,8 @@ myfidn_myiidn
 The file should be called `new_sample_names.txt`. Then, `bcftools reheader` 
 should be used to remame the samples:
 
+If you have genome-wide data:
+
 ```
 bcftools reheader \
   --samples new_sample_names.txt \
@@ -195,17 +198,53 @@ bcftools reheader \
   COHORT.vcf.gz
 ```
 
+If you have data per chromosome:
+
+```
+for CHR in `seq 1 22`
+do
+  bcftools reheader \
+    --samples new_sample_names.txt \
+    --output COHORT_chr${CHR}_proper_names.vcf.gz \
+  COHORT_chr${CHR}.vcf.gz
+done
+```
+
+If this step has been performed, from now on we assume that `COHORT` is the same
+as `COHORT_proper_names` prefix.
+
+
 If you have proper IIDs and FIDs in the VCF which respect PLINK assumptions
-(underscore separation), the command to convert to PLINK format is:
+(underscore separation), the command to convert to PLINK format genome-wide is:
 
 ```
 plink --vcf COHORT.vcf.gz --make-bed --out COHORT
 ```
 
-If you don't have separate IIDs and FIDs, then the command should be:
+or for each chromosome:
+
+```
+for CHR in `seq 1 22`
+do
+  plink --vcf COHORT_chr${CHR}.vcf.gz --make-bed --out COHORT_chr${CHR}
+done
+``` 
+
+If you don't have separate IIDs and FIDs, then the command for genome-wide data
+should be:
 
 ```
 plink --vcf COHORT.vcf.gz --make-bed --double-id --out COHORT
+```
+
+or, per chromosome:
+
+```
+for CHR in `seq 1 22`
+do
+  plink --vcf COHORT_chr${CHR}.vcf.gz --make-bed --double-id \
+    --out COHORT_chr${CHR}
+done
 ```
 
 ### 0.1.2 Data are in PLINK format
@@ -218,13 +257,14 @@ transformed to BED+BIM+FAM. For example, if you have PED+MAP format:
 plink --file COHORT --make-bed --out COHORT
 ```
 
-If you have PLINK files per chromosome, these should be merged in one 
-BED+BIM+FAM triplet (FAM should be the same for all). It is your responsibility
-to deal with potential issues that can arise from the merging (e.g. duplicates)
-prior to merging.
+If you have PLINK files per chromosome and you would prefer (e.g. enough 
+computational resources) to perform the analysis genome-wide and not per 
+chromosome, these should be merged in one BED+BIM+FAM triplet (FAM should be the 
+same for all). It is your responsibility to deal with potential issues that can 
+arise from the merging (e.g. duplicates) prior to merging.
 
 ```
-for CHR in 1..22
+for CHR in `seq 1 22`
 do
   echo COHORT_chr${CHR} >> mergelist.txt
 done
@@ -232,14 +272,27 @@ done
 plink --merge-list mergelist.txt --make-bed --out COHORT
 ```
 
+If you prefer to perform the analysis per chromosome (e.g. not enough 
+computational resources or enough computational resources to run everything in
+parallel), then the above merging step can be skipped. Again, it is your
+responsibility to keep track of issues such as duplicates etc.
+
 ## 0.2 QC with PLINK
 
-At this point, you should be having a single BED+BIM+FAM triplet:
+At this point, you should be having a single BED+BIM+FAM triplet
 
 ```
 COHORT.bed
 COHORT.bim
 COHORT.fam
+```
+
+or a triplet per chromosome (`Z = 1..22`)
+
+```
+COHORT_chrZ.bed
+COHORT_chrZ.bim
+COHORT_chrZ.fam
 ```
 
 Based on this we proceed with sample and variant filtering.
@@ -259,6 +312,8 @@ The following sample filters are recommended:
 
 Below, we sequentially apply variant and sample filters according to widely
 accepted [best practices](https://onlinelibrary.wiley.com/doi/10.1002/sim.6605).
+
+### 0.2.1 Genome-wide QC
 
 First, we calculate heterozygosities:
 
@@ -304,8 +359,8 @@ plink \
   --mind 0.05
 ```
 
-We now create files with variants and samples to *keep* (samples to keep will 
-are merged with those passing heterozygosity filters):
+We now create files with variants and samples to *keep* (samples to keep are 
+merged with those passing heterozygosity filters):
 
 ```
 cut -d" " -f1-2 COHORT_tmp.fam > generic_samples_pass.txt
@@ -385,6 +440,208 @@ plink \
 Principal Component Analysis (optional)
 
 *WIP*
+
+### 0.2.2 QC per chromosome and sample
+
+First, we calculate heterozygosities per chromosome:
+
+```
+for CHR in `seq 1 22`
+do
+plink \
+  --bfile COHORT_chr${CHR} \
+  --out COHORT_chr${CHR} --het
+done
+```
+
+Then, we create a file with sample names with heterozygosities within the limits
+of our filter (sample filter #2 above):
+
+```
+Rscript \
+  -e '{
+    # Read heterozygosity calculations per chromosome
+    chrs <- seq_len(22)
+    hetData <- lapply(chrs,function(x) {
+        hetFile <- paste0("COHORT_chr",x,".het")
+        return(read.table(hetFile,header=TRUE,check.names=FALSE))
+    })
+
+    # Sum required numbers for each chromosome
+    ohom <- rowSums(do.call("cbind",lapply(hetData,function(x) {
+        return(x[,3])
+    })))
+    nnm <- rowSums(do.call("cbind",lapply(hetData,function(x) {
+        return(x[,5])
+    })))
+
+    # Calculate heterozygosity and filter
+    heterozygosity <- 1 - ohom/nnm
+    names(heterozygosity) <- rownames(hetData[[1]])
+    avg <- median(heterozygosity,na.rm=TRUE)
+    dev <- IQR(heterozygosity,na.rm=TRUE)
+    keep <- heterozygosity > avg - 3*dev & heterozygosity < avg + 3*dev
+
+    # Write the remaining samples for later
+    write.table(hetData[[1]][keep,c("FID","IID"),drop=FALSE],
+      file="het_samples_pass.txt",col.names=FALSE,row.names=FALSE,
+      quote=FALSE)
+  }'
+```
+
+The file `het_samples_pass.txt` will be used after the next filters to compile 
+a final list of samples to be kept in later analysis.
+
+The following `plink` command will apply variant filters #1,2,3:
+
+```
+for CHR in `seq 1 22`
+do
+plink \
+  --bfile COHORT_chr${CHR} \
+  --out COHORT_chr${CHR}_tmp \
+  --make-bed \
+  --geno 0.02 \
+  --maf 0.05 \
+  --hwe 0.000001
+done
+```
+
+For sample filter #1, a different approach must be followed, where missingness
+is calculated per chromosome and then averaged. If the average values are below 
+the inclusion threshold, the sample is excluded. **Please note that the average
+values when calculated per chromosome may slightly differ if the analysis is
+performed genome-wide**.
+
+Firstly we calculate missing reports for each chromosome:
+
+```
+for CHR in `seq 1 22`
+do
+plink \
+  --bfile COHORT_chr${CHR} \
+  --out COHORT_chr${CHR} \
+  --missing gz
+done
+```
+
+Then, we will read the report for each chromosome and calculate average 
+missingness rates for each sample:
+
+```
+Rscript \
+  -e '{
+    ids <- read.table("COHORT_chr1.imiss.gz",header=TRUE)[,c(1,2)]
+    chrs <- seq_len(22)
+    missSampleData <- lapply(chrs,function(x) {
+        missFile <- paste0("COHORT_chr",x,".imiss.gz")
+        missData <- read.table(missFile,header=TRUE)
+        fMiss <- missData[,6]
+    })
+    missingness <- rowMeans(do.call("cbind",missSampleData))
+    keep <- missingness < 0.95
+    write.table(ids[keep,,drop=FALSE],file="miss_samples_pass.txt",
+      col.names=FALSE,row.names=FALSE,quote=FALSE)
+  }'
+```
+
+The file `miss_samples_pass.txt` contains FID/IIDs of the samples that pass the
+missingness test.
+
+We now create files with variants and samples to *keep* (samples to keep are 
+merged with those passing heterozygosity filters):
+
+For variants:
+
+```
+for CHR in `seq 1 22`
+do
+  cut -f2 COHORT_chr${CHR}_tmp.bim > generic_variants_pass_chr${CHR}.txt
+done
+```
+
+For samples:
+
+```
+Rscript \
+  -e '{
+    het <- read.table("het_samples_pass.txt")
+    rownames(het) <- het[,2]
+    gen <- read.table("miss_samples_pass.txt")
+    rownames(gen) <- gen[,2]
+    pass <- intersect(rownames(het),rownames(gen))
+    write.table(gen[pass,,drop=FALSE],file="all_samples_pass.txt",
+      col.names=FALSE,row.names=FALSE,quote=FALSE)
+  }'
+```
+
+Based on the variant and sample content of the files 
+`generic_variants_pass_chrZ.txt` with `Z = 1..22` and `all_samples_pass.txt` 
+we create filtered PLINK files for each chromosome. These will be used
+for IBD analysis filtering (can be skipped if not necesseary) and PCA.
+
+```
+for CHR in `seq 1 22`
+do
+  plink \
+    --bfile COHORT_chr${CHR} \
+    --out COHORT_filtered_chr${CHR} \
+    --extract generic_variants_pass_chr${CHR}.txt \
+    --keep all_samples_pass.txt \
+    --make-bed
+done
+```
+
+In order to perform IBD analysis and filtering (sample filter #3) we firstly 
+perform LD-pruning to exclude variants in LD and then IBD calculations with
+`plink`. LD-pruning will produce the file `COHORT_filtered.prune.out` which will
+be used for IBD calculations:
+
+```
+plink \
+  --bfile COHORT_filtered \
+  --out COHORT_filtered \
+  --indep-pairwise 50 5 0.2
+  
+plink \
+  --bfile COHORT_filtered \
+  --out COHORT_filtered \
+  --genome gz \
+  --exclude COHORT_filtered.prune.out
+```
+
+The file `COHORT_filtered.genome.gz` is compressed as it may be large. We are
+using this in order to find any samples to exclude:
+
+```
+Rscript\
+  -e '{
+    fam <- read.table("COHORT_filtered.fam")
+    ibdCoeff <- read.table("COHORT_filtered.genome.gz",header=TRUE)
+    ibdCoeff <- ibdCoeff[ibdCoeff$PI_HAT>=0.5,,drop=FALSE]
+    if (nrow(ibdCoeff) > 0) {
+        bad <- unique(c(ibdCoeff$IID1,ibdCoeff$IID2))
+        ii <- match(bad,fam[,2])
+        write.table(fam[ii,c(1,2),drop=FALSE],file="ibd_samples_remove.txt",
+          col.names=FALSE,row.names=FALSE,quote=FALSE)
+    }
+  }'
+```
+
+Create PLINK files ready for PCA:
+
+```
+plink \
+  --bfile COHORT_filtered \
+  --out COHORT_ibd \
+  --remove ibd_samples_remove.txt \
+  --make-bed
+```
+
+Principal Component Analysis (optional)
+
+*WIP*
+
 
 ## 0.3 Cleanup (optional)
 
@@ -708,6 +965,32 @@ case with real data.
 
 ## Notes
 
-If multicore, use `&`
-Consider using `nohup`
+* If you work in a multicore Linux system with enough available RAM, use the
+ambersand (`&`) symbol at the end of command lines, for example:
+
+```
+for CHR in `seq 1 22`
+do
+plink \
+  --bfile COHORT_chr${CHR} \
+  --out COHORT_chr${CHR} --het &
+done
+```
+
+This will spawn 22 processes working in parallel and will produce one 
+heterozygosity file per chromosome.
+
+* Consider using `nohup` for longer calculations (e.g. many samples on imputed
+data) that cannot finish in an interactive shell session in reasonable time. For
+example, put the following in a file `zzz.sh`
+
+```
+```
+
+Then, execute:
+
+```
+```
+
+
 [How to use inverse normal transformation of residuals](https://www.biostars.org/p/312945/)
