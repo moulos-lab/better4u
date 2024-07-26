@@ -133,18 +133,27 @@ RUN apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 # Container Instructions
 # =============================================================================
 
-# # Apptainer
-# ## Build Instructions
-# Build the Apptainer image at the specified location, from the Docker image (see below).
+# # Build Instructions
+
+# ## Docker
+# First build the Docker image with a custom tag specified by `-t`.
+# ```bash
+# docker build -t better4u ./
+# ```
+
+# ## Apptainer
+# Then, optionally, build an Apptainer image from the Docker image.
 # For convenience put it in the project dir.
 # ```bash
 # apptainer build ./better4u.sif docker-daemon:better4u:latest 
 # ```
 
-# ## Usage Example
+# # Usage Instructions
+
+# ## For Apptainer
 # ### Create the Container
-# Run the container with no external network connectivity with `--net --network none`
-# from the project dir so it is mounted automatically.
+# Create the container with no external network connectivity with `--net --network none`.
+# Do this from the project dir so it is mounted automatically.
 # ```bash
 # apptainer run --net --network none path/to/better4u.sif
 # ```
@@ -152,16 +161,10 @@ RUN apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 # ### Execute Commands in the Running Container
 # Simply run commands as you would in any interactive shell and exit when finished.
 
-# # Docker
-# ## Build Instructions
-# Build the Docker image with a custom tag specified by `-t`.
-# ```bash
-# docker build -t better4u ./
-# ```
-
-# ## Usage Example
+# ## For Docker
 # ### Create the Container
-# Run the container with no external network connectivity with `--network none`.
+# Create the container with no external network connectivity with `--network none`
+# and mount the project dir.
 # ```bash
 # docker run -t -d --name better4u -v /path/to/project/dir:/app --network none better4u
 # ```
@@ -185,6 +188,7 @@ RUN apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 # ```
 
 # # Example Commands for Tools
+
 # Commands are given for Apptainer in the first line, then for Docker.
 # ### BCFTools
 # ```bash
