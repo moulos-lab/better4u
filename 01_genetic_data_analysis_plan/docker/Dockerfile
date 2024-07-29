@@ -99,7 +99,7 @@ RUN R -e "install.packages(c('susieR', 'parallel', 'utils', 'remotes', \
     R -e "install.packages('BiocManager')" && \
     R -e "library(BiocManager); BiocManager::install('snpStats')"
 
-# Install dependencies and SAIGE
+# Install SAIGE and dependencies
 RUN apt-get update && apt-get install -y -q \
     cmake git pip file libfontconfig1-dev libharfbuzz-dev libfribidi-dev \
     libcurl4-openssl-dev libssl-dev libxml2-dev libfreetype6-dev libpng-dev \
@@ -115,6 +115,18 @@ RUN apt-get update && apt-get install -y -q \
     # RUN R CMD INSTALL SAIGE --configure-args='SHELL_OPTS="set --"' \
     chmod +x /tools/SAIGE/extdata/step* && \
     cp /tools/SAIGE/extdata/step* /usr/local/bin/
+
+# Install MR-MEGA
+WORKDIR /tools/mrmega
+
+RUN wget https://tools.gi.ut.ee/tools/MR-MEGA_v0.2.zip && \
+    unzip MR-MEGA_v0.2.zip && \
+    rm MR-MEGA_v0.2.zip && \
+    make && \
+    curl -o fixP.r https://tools.gi.ut.ee/tools/fixP.r && \
+    curl -o manh.r https://tools.gi.ut.ee/tools/manh.r && \
+    curl -o qq.r https://tools.gi.ut.ee/tools/qq.r
+ENV PATH=/tools/mrmega:$PATH
 
 # Reset frontend to default
 ENV DEBIAN_FRONTEND=teletype
@@ -234,6 +246,17 @@ RUN apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 # docker exec better4u snptest -help
 # ```
 
+# ### MR-MEGA
+# ```bash
+# MR-MEGA --help
+# docker exec better4u MR-MEGA --help
+# ```
+# Use the utility scripts like this (per documentation):
+# ```bash
+# R --slave --vanilla < /tools/mrmega/fixP.r
+# docker exec better4u R --slave --vanilla < /tools/mrmega/fixP.r
+# ```
+
 # ## Tool Versions
 # Here are the versions of the tools included in this Docker image:
 # ```
@@ -247,6 +270,7 @@ RUN apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 # | GCTA       | 1.94.1  |
 # | SNPTEST    | 2.5.6   |
 # | PRSice2    | 2.3.5   |
+# | MR-MEGA    | 0.2     |
 # | R          | 4.4.1   |
 # ```
 
