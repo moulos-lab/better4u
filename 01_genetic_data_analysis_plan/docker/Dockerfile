@@ -1,6 +1,7 @@
 FROM phusion/baseimage:jammy-1.0.4 AS base
 
-LABEL author="Stelios GKIONIS <gkionis@fleming.gr>"
+LABEL description="Container with tools for the Better4u project"
+LABEL maintainer="Stelios GKIONIS <gkionis@fleming.gr>"
 
 # # baseimage-docker's init system cannot be used with Apptainer.
 # ENTRYPOINT ["/sbin/my_init"]
@@ -76,7 +77,7 @@ RUN wget http://www.well.ox.ac.uk/~gav/resources/snptest_v2.5.6_CentOS_Linux7.8-
     mv snptest/snptest_v2.5.6 snptest/snptest
 ENV PATH=/tools/snptest:$PATH
 
-# Differs from github instructions
+# PRSice installation differs from github instructions
 WORKDIR /tools/prsice
 
 RUN wget https://github.com/choishingwan/PRSice/releases/download/2.3.5/PRSice_linux.zip && \
@@ -125,7 +126,9 @@ RUN wget https://tools.gi.ut.ee/tools/MR-MEGA_v0.2.zip && \
     make && \
     curl -o fixP.r https://tools.gi.ut.ee/tools/fixP.r && \
     curl -o manh.r https://tools.gi.ut.ee/tools/manh.r && \
-    curl -o qq.r https://tools.gi.ut.ee/tools/qq.r
+    curl -o qq.r https://tools.gi.ut.ee/tools/qq.r && \
+    sed -i '1i#!/usr/bin/Rscript --slave --vanilla\n' fixP.r manh.r qq.r && \
+    chmod +x fixP.r manh.r qq.r
 ENV PATH=/tools/mrmega:$PATH
 
 # Reset frontend to default
