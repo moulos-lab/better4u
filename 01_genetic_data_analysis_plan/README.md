@@ -593,34 +593,59 @@ done
 ```
 
 In order to perform IBD analysis and filtering (sample filter #3) we firstly 
-perform LD-pruning to exclude variants in LD and then IBD calculations with
-`plink`. LD-pruning will produce the file `COHORT_filtered.prune.out` which will
-be used for IBD calculations:
+perform LD-pruning per chromosome to exclude variants in LD and then IBD 
+calculations with `plink`. LD-pruning will produce the files 
+`COHORT_filtered_chr${CHR}.prune.out` which will be used for IBD calculations:
 
 ```
+for CHR in `seq 1 22`
+do
 plink \
-  --bfile COHORT_filtered \
-  --out COHORT_filtered \
+  --bfile COHORT_filtered_chr${CHR} \
+  --out COHORT_filtered_chr${CHR} \
   --indep-pairwise 50 5 0.2
-  
+done
+
+Then we calculate relationships per chromosome:
+
+for CHR in `seq 1 22`
+do
 plink \
-  --bfile COHORT_filtered \
-  --out COHORT_filtered \
+  --bfile COHORT_filtered_chr${CHR} \
+  --out COHORT_filtered_chr${CHR} \
   --genome gz \
-  --exclude COHORT_filtered.prune.out
+  --exclude COHORT_filtered_chr${CHR}.prune.out
+done
 ```
 
-The file `COHORT_filtered.genome.gz` is compressed as it may be large. We are
-using this in order to find any samples to exclude:
+The files `COHORT_filtered_chrZ.genome.gz` (`Z = 1..22`) are compressed as they 
+may be large. We are using them in order to find any samples to exclude.
+**Please note that at present we are not able to provide an official method for
+estimating genome-wide IBD coefficients but calculated per chromosome while
+using a minimal toolset at the same time for data integrity and interoperability
+issues. The following method (median `PH_HAT` accross chromosomes) seems to be
+adequately compatible with the original.**
 
 ```
-Rscript\
+Rscript \
   -e '{
-    fam <- read.table("COHORT_filtered.fam")
-    ibdCoeff <- read.table("COHORT_filtered.genome.gz",header=TRUE)
-    ibdCoeff <- ibdCoeff[ibdCoeff$PI_HAT>=0.5,,drop=FALSE]
-    if (nrow(ibdCoeff) > 0) {
-        bad <- unique(c(ibdCoeff$IID1,ibdCoeff$IID2))
+    fam <- read.table("COHORT_filtered_chr1.fam")
+    chrs <- seq_len(22)
+    ibdCoeffs <- do.call("cbind",lapply(chrs,function(x) {
+        message("Reading for chromosome ",x)
+        ibdFile <- paste0("COHORT_filtered_chr",x,".genome.gz")
+        ibdCoeff <- read.table(ibdFile,header=TRUE)
+        return(ibdCoeff$PI_HAT)
+    }))
+
+    ibdCoeffs <- apply(ibdCoeffs,1,median)
+    ibdCoeffNames <- read.table("COHORT_filtered_chr1.genome.gz",header=TRUE)
+    ibdCoeffs <- cbind(ibdCoeffNames[,1:4],ibdCoeffs)
+    colnames(ibdCoeffs)[5] <- "PI_HAT"
+
+    ibdCoeffs <- ibdCoeffs[ibdCoeffs$PI_HAT>=0.5,,drop=FALSE]
+    if (nrow(ibdCoeffs) > 0) {
+        bad <- unique(c(ibdCoeffs$IID1,ibdCoeffs$IID2))
         ii <- match(bad,fam[,2])
         write.table(fam[ii,c(1,2),drop=FALSE],file="ibd_samples_remove.txt",
           col.names=FALSE,row.names=FALSE,quote=FALSE)
@@ -631,11 +656,14 @@ Rscript\
 Create PLINK files ready for PCA:
 
 ```
+for CHR in `seq 1 22`
+do
 plink \
-  --bfile COHORT_filtered \
-  --out COHORT_ibd \
+  --bfile COHORT_filtered_chr${CHR} \
+  --out COHORT_ibd_chr${CHR} \
   --remove ibd_samples_remove.txt \
   --make-bed
+done
 ```
 
 Principal Component Analysis (optional)
@@ -674,9 +702,10 @@ do
 done
 ```
 
-Subsequently, we concatenate the VCF files in preparation for conversion to
-PLINK format for the rest of the filtering as well as PCA operations. We assume
-that the concatenated VCF file is called `COHORT_imputed.vcf.gz`:
+Subsequently, we (optionally, depending on the preferred analysis mode, genome-
+wide or per chromosome) concatenate the VCF files in preparation for conversion 
+to PLINK format for the rest of the filtering as well as PCA operations. We 
+assume that the concatenated VCF file is called `COHORT_imputed.vcf.gz`:
 
 ```
 bcftools concat \
@@ -689,6 +718,16 @@ Finally, we convert to PLINK:
 
 ```
 plink --vcf COHORT_imputed.vcf.gz --make-bed --out COHORT_imputed
+```
+
+or for each chromosome if we maintain files per chromosome:
+
+```
+for CHR in `seq 1 22`
+do
+  plink --vcf chr${CHR}_filtered.dose.vcf.gz --make-bed \
+    --out COHORT_imputed_chr${CHR}
+done
 ```
 
 ## 1.2 Post-imputation QC with PLINK
@@ -707,6 +746,8 @@ For sample filters:
 2. Heterozygosity: median(heterozygosity) &plusmn; 3 &times; IQR
 3. Removal of possible gender mismatches
 4. PCA: outlier removal
+
+### 1.2.1 Genome-wide QC
 
 As in pre-imputation. we sequentially apply variant and sample filters.
 
@@ -789,6 +830,251 @@ Principal Component Analysis
 
 *WIP*
 
+### 1.2.2 QC per chromosome and sample
+
+First, we calculate heterozygosities per chromosome:
+
+```
+for CHR in `seq 1 22`
+do
+plink \
+  --bfile COHORT_imputed_chr${CHR} \
+  --out COHORT_imputed_chr${CHR} --het
+done
+```
+
+Then, we create a file with sample names with heterozygosities within the limits
+of our filter (sample filter #2 above):
+
+```
+Rscript \
+  -e '{
+    # Read heterozygosity calculations per chromosome
+    chrs <- seq_len(22)
+    hetData <- lapply(chrs,function(x) {
+        hetFile <- paste0("COHORT_imputed_chr",x,".het")
+        return(read.table(hetFile,header=TRUE,check.names=FALSE))
+    })
+
+    # Sum required numbers for each chromosome
+    ohom <- rowSums(do.call("cbind",lapply(hetData,function(x) {
+        return(x[,3])
+    })))
+    nnm <- rowSums(do.call("cbind",lapply(hetData,function(x) {
+        return(x[,5])
+    })))
+
+    # Calculate heterozygosity and filter
+    heterozygosity <- 1 - ohom/nnm
+    names(heterozygosity) <- rownames(hetData[[1]])
+    avg <- median(heterozygosity,na.rm=TRUE)
+    dev <- IQR(heterozygosity,na.rm=TRUE)
+    keep <- heterozygosity > avg - 3*dev & heterozygosity < avg + 3*dev
+
+    # Write the remaining samples for later
+    write.table(hetData[[1]][keep,c("FID","IID"),drop=FALSE],
+      file="het_samples_pass.txt",col.names=FALSE,row.names=FALSE,
+      quote=FALSE)
+  }'
+```
+
+The file `het_samples_pass.txt` will be used after the next filters to compile 
+a final list of samples to be kept in later analysis.
+
+The following `plink` command will apply variant filters #1,2,3:
+
+```
+for CHR in `seq 1 22`
+do
+plink \
+  --bfile COHORT_imputed_chr${CHR} \
+  --out COHORT_imputed_chr${CHR}_tmp \
+  --make-bed \
+  --geno 0.02 \
+  --maf 0.05 \
+  --hwe 0.000001
+done
+```
+
+For sample filter #1, a different approach must be followed, where missingness
+is calculated per chromosome and then averaged. If the average values are below 
+the inclusion threshold, the sample is excluded. **Please note that the average
+values when calculated per chromosome may slightly differ if the analysis is
+performed genome-wide**.
+
+Firstly we calculate missing reports for each chromosome:
+
+```
+for CHR in `seq 1 22`
+do
+plink \
+  --bfile COHORT_imputed_chr${CHR} \
+  --out COHORT_imputed_chr${CHR} \
+  --missing gz
+done
+```
+
+Then, we will read the report for each chromosome and calculate average 
+missingness rates for each sample:
+
+```
+Rscript \
+  -e '{
+    ids <- read.table("COHORT_imputed_chr1.imiss.gz",header=TRUE)[,c(1,2)]
+    chrs <- seq_len(22)
+    missSampleData <- lapply(chrs,function(x) {
+        missFile <- paste0("COHORT_imputed_chr",x,".imiss.gz")
+        missData <- read.table(missFile,header=TRUE)
+        fMiss <- missData[,6]
+    })
+    missingness <- rowMeans(do.call("cbind",missSampleData))
+    keep <- missingness < 0.95
+    write.table(ids[keep,,drop=FALSE],file="miss_samples_pass.txt",
+      col.names=FALSE,row.names=FALSE,quote=FALSE)
+  }'
+```
+
+The file `miss_samples_pass.txt` contains FID/IIDs of the samples that pass the
+missingness test.
+
+We now create files with variants and samples to *keep* (samples to keep are 
+merged with those passing heterozygosity filters):
+
+For variants:
+
+```
+for CHR in `seq 1 22`
+do
+  cut -f2 COHORT_imputed_chr${CHR}_tmp.bim > generic_variants_pass_chr${CHR}.txt
+done
+```
+
+For samples:
+
+```
+Rscript \
+  -e '{
+    het <- read.table("het_samples_pass.txt")
+    rownames(het) <- het[,2]
+    gen <- read.table("miss_samples_pass.txt")
+    rownames(gen) <- gen[,2]
+    pass <- intersect(rownames(het),rownames(gen))
+    write.table(gen[pass,,drop=FALSE],file="all_samples_pass.txt",
+      col.names=FALSE,row.names=FALSE,quote=FALSE)
+  }'
+```
+
+Based on the variant and sample content of the files 
+`generic_variants_pass_chrZ.txt` with `Z = 1..22` and `all_samples_pass.txt` 
+we create filtered PLINK files for each chromosome. These will be used
+for IBD analysis filtering (can be skipped if not necesseary) and PCA.
+
+```
+for CHR in `seq 1 22`
+do
+  plink \
+    --bfile COHORT_imputed_chr${CHR} \
+    --out COHORT_imputed_filtered_chr${CHR} \
+    --extract generic_variants_pass_chr${CHR}.txt \
+    --keep all_samples_pass.txt \
+    --make-bed
+done
+```
+
+In order to perform IBD analysis and filtering (sample filter #3) we firstly 
+perform LD-pruning per chromosome to exclude variants in LD and then IBD 
+calculations with `plink`. LD-pruning will produce the files 
+`COHORT_imputed_filtered_chr${CHR}.prune.out` which will be used for IBD
+calculations:
+
+```
+for CHR in `seq 1 22`
+do
+plink \
+  --bfile COHORT_imputed_filtered_chr${CHR} \
+  --out COHORT_imputed_filtered_chr${CHR} \
+  --indep-pairwise 50 5 0.2
+done
+
+Then we calculate relationships per chromosome:
+
+for CHR in `seq 1 22`
+do
+plink \
+  --bfile COHORT_imputed_filtered_chr${CHR} \
+  --out COHORT_imputed_filtered_chr${CHR} \
+  --genome gz \
+  --exclude COHORT_imputed_filtered_chr${CHR}.prune.out
+done
+```
+
+The files `COHORT_filtered_chrZ.genome.gz` (`Z = 1..22`) are compressed as they 
+may be large. We are using them in order to find any samples to exclude.
+**Please note that at present we are not able to provide an official method for
+estimating genome-wide IBD coefficients but calculated per chromosome while
+using a minimal toolset at the same time for data integrity and interoperability
+issues. The following method (median `PH_HAT` accross chromosomes) seems to be
+adequately compatible with the original.** Also, please note that for large
+populations, reading IBD `*.genome.gz` files may take a considerable amount of
+time. Consider replacing `read.table` with `fread` from the package 
+`data.table`.
+
+```
+Rscript \
+  -e '{
+    fam <- read.table("COHORT_imputed_filtered_chr1.fam")
+    chrs <- seq_len(22)
+    ibdCoeffs <- do.call("cbind",lapply(chrs,function(x) {
+        message("Reading for chromosome ",x)
+        ibdFile <- paste0("COHORT_imputed_filtered_chr",x,".genome.gz")
+        ibdCoeff <- read.table(ibdFile,header=TRUE)
+        return(ibdCoeff$PI_HAT)
+    }))
+
+    ibdCoeffs <- apply(ibdCoeffs,1,median)
+    ibdCoeffNames <- read.table("COHORT_imputed_filtered_chr1.genome.gz",
+        header=TRUE)
+    ibdCoeffs <- cbind(ibdCoeffNames[,1:4],ibdCoeffs)
+    colnames(ibdCoeffs)[5] <- "PI_HAT"
+
+    ibdCoeffs <- ibdCoeffs[ibdCoeffs$PI_HAT>=0.5,,drop=FALSE]
+    if (nrow(ibdCoeffs) > 0) {
+        bad <- unique(c(ibdCoeffs$IID1,ibdCoeffs$IID2))
+        ii <- match(bad,fam[,2])
+        write.table(fam[ii,c(1,2),drop=FALSE],file="ibd_samples_remove.txt",
+          col.names=FALSE,row.names=FALSE,quote=FALSE)
+    }
+  }'
+```
+
+Create reduced (by removed samples) PLINK files ready for PCA:
+
+```
+for CHR in `seq 1 22`
+do
+plink \
+  --bfile COHORT_imputed_filtered_chr${CHR} \
+  --out COHORT_imputed_ibd_chr${CHR} \
+  --remove ibd_samples_remove.txt \
+  --make-bed
+done
+```
+
+And then merge them in preparation for PC projection to 1000 genomes:
+
+```
+for CHR in `seq 1 22`
+do
+  echo COHORT_imputed_ibd_chr${CHR} >> mergelist.txt
+done
+
+plink --merge-list mergelist.txt --out COHORT_imputed_filtered_merged
+```
+
+Principal Component Analysis
+
+*WIP*
+
 ## 1.3 Non-genetic related sample exclusions
 
 Individuals of all age groups will be included in the analyses. However, the
@@ -802,6 +1088,41 @@ condition that significantly alters normal body weight will be excluded.
 **IMPORTANT**: Analyses will take place separately for children/adolescents <18 
 years old and adults older than 18 years old.
 
+## 1.4 Principal Component projections
+
+In this step the file `pca_variants.txt` will be used in order to create a PLINK
+fileset with a subset of variants contained in this file. Then, these will be
+used with the files `loads_1000g.txt` and `means_1000g.txt` along with the 
+projection functionality of `flashpca` to create the PC covariates for your
+cohort. The PC projections have to be provided to the central analysis team.
+
+**IMPORTANT**: It is **your** responsibility to make sure that **all** the 
+variants in the provided file `pca_variants.txt` are present in your cohort. If
+the cohort is not very small and has been imputed with HRC panel, this should
+not be a problem. Otherwise, please contact the central analysis team 
+**immediately**.
+
+Firstly, create the PLINK files for PCA projection:
+
+```
+plink \
+  --bfile COHORT_imputed_filtered_merged \
+  --out COHORT_for_PCA \
+  --extract pca_variants.txt \
+  --make-bed
+```
+
+Then, project:
+
+```
+flashpca \
+  --bfile COHORT_for_PCA \
+  --inmeansd means_1000g.txt \
+  --inload loads_1000g.txt
+  --project \
+  --outproj projections.txt \
+  --verbose
+```
 
 # 2. Genome-wide association analyses
 
@@ -994,3 +1315,20 @@ Then, execute:
 
 
 [How to use inverse normal transformation of residuals](https://www.biostars.org/p/312945/)
+
+
+
+In step S3: I think we'll use a set of LD pruned SNPs that are present in the 1000 genomes (with e.g. MAF>=5% cutoff). We can use PLINK to do the LD pruning.
+
+Because we will use PCs for a global set of populations, 20 PCs would be good (with 10 used as covariates in GWAS).
+
+We will use option 3, projecting partner's data onto the 1000G PC's - this is the only way to guarantee that PC's will have the same meaning across datasets (without pooling individual level data).
+
+In step S4: as above, we will calculate PC scores using 1000G PCs (i.e. projecting onto a fixed set of PCs).
+
+flashpca
+wget https://github.com/gabraham/flashpca/releases/download/v2.0/flashpca_x86-64.gz
+gunzip flashpca_x86-64.gz
+chmod +x flashpca_x86-64
+
+./flashpca_x86-64 --bfile ../COHORT_ibd --ndim 20
