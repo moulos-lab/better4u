@@ -1060,7 +1060,7 @@ plink \
 done
 ```
 
-And then merge them in preparation for PC projection to 1000 genomes:
+And then merge them in preparation for PCA and/or PC projection to 1000 genomes:
 
 ```
 for CHR in `seq 1 22`
@@ -1089,6 +1089,15 @@ condition that significantly alters normal body weight will be excluded.
 years old and adults older than 18 years old.
 
 ## 1.4 Principal Component projections
+
+The central analysis team will provide three files based on Principal Component
+Analysis of the current 1000 genomes data. These files will be:
+
+- `pca_variants.txt`: a set of SNPs whose loadings will be used to project your
+local genotypes to 1000 genomes and be used as covariates in subsequent GWAS.
+- `loads_1000g.txt`: the aforementioned loadings.
+- `means_1000g.txt`: means and standard deviations of the loadings required by
+`flashpca`.
 
 In this step the file `pca_variants.txt` will be used in order to create a PLINK
 fileset with a subset of variants contained in this file. Then, these will be
@@ -1123,6 +1132,58 @@ flashpca \
   --outproj projections.txt \
   --verbose
 ```
+
+We are now editing the file `projections.txt` so as to:
+
+1. Anonymize the individual ids accompanying the PC projections
+2. Create a map between the new and the old ids
+
+```
+Rscript \
+  -e '{
+    NUMBERS <- as.character(seq(0,9))
+
+    .randomString <- function(n=1,s=5) {
+        SPACE <- sample(c(LETTERS,NUMBERS),length(LETTERS)+length(NUMBERS))
+        return(do.call(paste0,replicate(s,sample(SPACE,n,replace=TRUE),FALSE)))
+    }
+
+    PREFIX <- "YOUR_PARTNER_ID_IN_GRANT e.g. HUA"
+    PREFIX <- "HUA"
+
+    # Read in projections
+    proj <- read.delim("projections.txt")
+
+    # Strip FIDs
+    proj <- proj[,-1,drop=FALSE]
+
+    # Create random names and the map
+    # We create 10-letter random strings to allow enough variability and avoid
+    # random same string in larger populations
+    set.seed(42)
+    newids <- paste(PREFIX,.randomString(nrow(proj),10),sep="")
+    map <- cbind(proj$IID,newids)
+    colnames(map) <- c("cohort_iid","pseudo_iid")
+
+    # Replace the ids and write output
+    proj$IID <- newids
+    write.table(map,file="cohort_pseudo_map.txt",row.names=FALSE,sep="\t",
+        quote=FALSE)
+    write.table(proj,file="shared_projections.txt",row.names=FALSE,sep="\t",
+        quote=FALSE)
+
+  }'
+```
+
+The file `shared_projections.txt` will be returned to the central analysis team 
+for processing. Its totality or part of it (e.g. if samples will be exluded as 
+outliers) will be returned to you to be used along with other covariates in the
+subsequent GWAS.
+
+The file `cohort_pseudo_map.txt` must be safely stored by you to map the 
+included individuals returned by the central analysis team (if anyone excluded)
+for the subsequent site-specific GWAS. The `set.seed()` function ensures that
+the same ids can be regenerated in case of loss.
 
 # 2. Genome-wide association analyses
 
@@ -1187,8 +1248,10 @@ plink \
   --exclude toy.prune.out
 ```
 
-The output is written to `toy.eigenvec`. We then construct the covariates and
-phenotype file:
+The output is written to `toy.eigenvec`. This is just for example purposes. 
+During the normal execution, you will not calculate PCs with PLINK but rather 
+use the PC projections file provided by the central analysis team. We then
+construct the covariates and phenotype file:
 
 ```
 Rscript \
@@ -1303,32 +1366,37 @@ heterozygosity file per chromosome.
 
 * Consider using `nohup` for longer calculations (e.g. many samples on imputed
 data) that cannot finish in an interactive shell session in reasonable time. For
-example, put the following in a file `zzz.sh`
+example, put the commands to run in a file `commands.sh`, for example:
 
 ```
+#!/bin/bash
+
+for CHR in `seq 1 22`
+do
+plink \
+  --bfile COHORT_chr${CHR} \
+  --out COHORT_chr${CHR} --het &
+done
 ```
 
 Then, execute:
 
 ```
+nohup sh commands.sh > commands.log &
 ```
 
+and you can safely close the session and check e.g. the next day.
 
-[How to use inverse normal transformation of residuals](https://www.biostars.org/p/312945/)
+## Open issues
 
-
-
-In step S3: I think we'll use a set of LD pruned SNPs that are present in the 1000 genomes (with e.g. MAF>=5% cutoff). We can use PLINK to do the LD pruning.
-
-Because we will use PCs for a global set of populations, 20 PCs would be good (with 10 used as covariates in GWAS).
-
-We will use option 3, projecting partner's data onto the 1000G PC's - this is the only way to guarantee that PC's will have the same meaning across datasets (without pooling individual level data).
-
-In step S4: as above, we will calculate PC scores using 1000G PCs (i.e. projecting onto a fixed set of PCs).
-
-flashpca
-wget https://github.com/gabraham/flashpca/releases/download/v2.0/flashpca_x86-64.gz
-gunzip flashpca_x86-64.gz
-chmod +x flashpca_x86-64
-
-./flashpca_x86-64 --bfile ../COHORT_ibd --ndim 20
+* Which program will be used for GWAS? We have drafted examples using REGENIE.
+It was suggested by R. Pool to use GCTA as SAIGE and REGENIE do not behave well
+with twins.
+* "Anonymization" of PCs should be checked/verified.
+* Do we need also `FID` for the clustering of projected PCs? If yes the process
+above must be amended.
+* Do we need other population information to be provided along with the PC
+projections?
+* Will [the inverse normal transformation of residuals](https://www.biostars.org/p/312945/) 
+will be used for any BMI related associations?
+* Other intermediate steps?

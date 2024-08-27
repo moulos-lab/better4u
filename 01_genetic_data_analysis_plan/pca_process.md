@@ -230,3 +230,8 @@ flashpca \
   --project \
   --outproj proj_test.txt
 ```
+
+##### PC projection clustering
+
+We will need to draft an additional process for this as soon as we have some
+results.
