@@ -131,6 +131,12 @@ RUN wget https://tools.gi.ut.ee/tools/MR-MEGA_v0.2.zip && \
     chmod +x fixP.r manh.r qq.r
 ENV PATH=/tools/mrmega:$PATH
 
+RUN cd /usr/local/bin && \
+    wget https://github.com/gabraham/flashpca/releases/download/v2.0/flashpca_x86-64.gz && \
+    gzip -d flashpca_x86-64.gz && \
+    mv flashpca_x86-64 flashpca && \
+    chmod +x flashpca
+
 # Reset frontend to default
 ENV DEBIAN_FRONTEND=teletype
 
@@ -154,6 +160,11 @@ RUN apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 # First build the Docker image with a custom tag specified by `-t`.
 # ```bash
 # docker build -t better4u ./
+# ```
+# If needed, transfer the image file by saving it as .tar:
+# ```bash
+# docker save -o better4u.tar better4u
+# docker load -i better4u.tar
 # ```
 
 # ## Apptainer
@@ -260,6 +271,12 @@ RUN apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 # docker exec better4u R --slave --vanilla < /tools/mrmega/fixP.r
 # ```
 
+# ### FlashPCA
+# ```bash
+# flashpca --help
+# docker exec better4u flashpca --help
+# ```
+
 # ## Tool Versions
 # Here are the versions of the tools included in this Docker image:
 # ```
@@ -274,6 +291,7 @@ RUN apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 # | SNPTEST    | 2.5.6   |
 # | PRSice2    | 2.3.5   |
 # | MR-MEGA    | 0.2     |
+# | FlashPCA   | 2.0     |
 # | R          | 4.4.1   |
 # ```
 
