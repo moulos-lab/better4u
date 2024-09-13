@@ -28,13 +28,7 @@ do
 done
 ```
 
-## 2. Download 1000 Genomes PED file
-
-```
-wget ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/technical/working/20130606_sample_info/20130606_g1k.ped ;
-```
-
-## 3. Download the GRCh37/hg19 reference genome
+## 2. Download the GRCh37/hg19 reference genome
 
 For better data integority, we download the human reference genome version used
 by the consortium:
@@ -43,14 +37,15 @@ by the consortium:
 wget ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/technical/reference/human_g1k_v37.fasta.gz ;
 ```
 
-## 4. Convert the 1000 Genomes files to BCF
+## 3. Convert the 1000 Genomes files to BCF
 
 In the following we:
 
+* Include only SNPs with MAF > 0.05 (1st pipe)
 * Ensure that multi-allelic calls are split and that indels are left-aligned 
-compared to reference genome (1st pipe)
-* Set the VCF ID field to a unique value: `CHROM:POS:REF:ALT` (2nd pipe)
-* Remove duplicates (3rd pipe)
+compared to reference genome (2nd pipe)
+* Set the VCF ID field to a unique value: `CHROM:POS:REF:ALT` (3rd pipe)
+* Remove duplicates (4th pipe)
 
 Notes:
 
@@ -58,15 +53,17 @@ Notes:
 `CHROM:POS:REF:ALT*`
 - `-x ID -I +'%CHROM:%POS:%REF:%ALT'` first erases the current ID and then sets 
 it to `CHROM:POS:REF:ALT*`
+- Consider changing to `+'%CHROM:%POS'` for HRC purposes
 
 ```
 for CHR in `seq 1 22`; 
 do
   echo "Converting $CHR"
   
-  bcftools norm --multiallelics -any --check-ref w \
-    --fasta-ref human_g1k_v37.fasta \
+  bcftools view --include 'INFO/AF > 0.05' --types snps \
     ALL.chr${CHR}.phase3_shapeit2_mvncall_integrated_v5b.20130502.genotypes.vcf.gz | \
+  bcftools norm --multiallelics -any --check-ref w \
+    --fasta-ref human_g1k_v37.fasta | \
   bcftools annotate --remove ID --set-id +'%CHROM:%POS:%REF:%ALT' | \
   bcftools norm --output-type b --rm-dup both \
     --output ALL.chr${CHR}.phase3_shapeit2_mvncall_integrated_v5b.20130502.genotypes.bcf;
@@ -83,10 +80,33 @@ do
 done
 ```
 
+And get a list of the remaining variants in `CHROM:POS` format to later 
+intersect with the HRC panel variants:
+
+```
+for CHR in `seq 1 22`; 
+do
+  bcftools query --format '%CHROM:%POS' \    
+    ALL.chr"${CHR}".phase3_shapeit2_mvncall_integrated_v5b.20130502.genotypes.bcf \
+    > ALL.chr${CHR}.variant.ids;
+done
+```
+
 The above command will probably take some time, so they can be put in a shell
 script and executed with `nohup`.
 
-## 5. Convert the BCF files to PLINK format
+## 4. Remove any 1000 genomes variants not present in HRC
+
+Firstly, retrieve a list of all the HRC panel variants from [here](#). Then for
+each chromosome we produce a list of common variants (shoule be most of them):
+
+Read HRC in R
+Read 1000 in R
+Intersect
+Write final files
+Use below as extract/remove while creating PLINK
+
+## 4. Convert the BCF files to PLINK format
 
 Next, we convert BCF files to PLINK BED|BIM|FAM format so as to proceed with the
 operations required for PCA:
@@ -106,7 +126,7 @@ plink \
 done
 ```
 
-6. Prune variants from each chromosome
+## 5. Prune variants from each chromosome
 
 Prior to PCA, it is common practice to not use variants in LD, so LD pruning is
 performed.
@@ -142,7 +162,7 @@ do
 done
 ```
 
-7. Assemble the pruned SNPs and merge in preparation for PCA
+## 6. Assemble the pruned SNPs and merge in preparation for PCA
 
 Firstly, we collect a merge list file for PLINK:
 
@@ -229,6 +249,16 @@ flashpca \
   --inload ./1000/loads_test.txt \
   --project \
   --outproj proj_test.txt
+```
+
+##### Command to get a list of HRC variants from NAFLD HRC imputed data
+
+```
+for CHR in `seq 1 22`
+do
+  bcftools query --format '%ID' NAFLD.chr${CHR}.HRC.vcf.gz \
+    > chr${CHR}_HRC_ids.txt &
+done
 ```
 
 ##### PC projection clustering
