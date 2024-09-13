@@ -131,11 +131,22 @@ RUN wget https://tools.gi.ut.ee/tools/MR-MEGA_v0.2.zip && \
     chmod +x fixP.r manh.r qq.r
 ENV PATH=/tools/mrmega:$PATH
 
-RUN cd /usr/local/bin && \
-    wget https://github.com/gabraham/flashpca/releases/download/v2.0/flashpca_x86-64.gz && \
-    gzip -d flashpca_x86-64.gz && \
-    mv flashpca_x86-64 flashpca && \
-    chmod +x flashpca
+# Install FlashPCA
+WORKDIR /tools
+
+RUN apt-get update && apt-get install -y -q \
+    libeigen3-dev libboost-program-options-dev && \
+    wget https://github.com/yixuan/spectra/archive/refs/tags/v0.9.0.tar.gz && \
+    tar -xzvf v0.9.0.tar.gz && rm v0.9.0.tar.gz && \
+    wget https://github.com/gabraham/flashpca/releases/download/v2.0/flashpca_2.0.tar.gz && \
+    tar -xzvf flashpca_2.0.tar.gz && rm flashpca_2.0.tar.gz && \
+    cd flashpca_2.0 && \
+    sed -i '/^CXXFLAGS =/s/$/ -fpermissive/' Makefile && \
+    make all EIGEN_INC=/usr/include/eigen3 \
+        BOOST_INC=/usr/include/boost \
+        BOOST_LIB=/usr/lib/x86_64-linux-gnu \
+        SPECTRA_INC=/tools/spectra-0.9.0/include/Spectra
+ENV PATH=/tools/flashpca_2.0:$PATH
 
 # Reset frontend to default
 ENV DEBIAN_FRONTEND=teletype
