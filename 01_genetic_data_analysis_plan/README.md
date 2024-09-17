@@ -685,7 +685,27 @@ Therefore, their conversion to PLINK after imputation score filtering is more
 strightforward. The following assume that the VCF files are named as they are
 delivered by the Michigan Imputation Server, i.e. `chr{1..22}.dose.vcf.gz`.
 
-## 1.1 Poorly imputed variant filtering and conversion to PLINK
+## 1.1 Provision of HRC good quality variants for PCA
+
+You will need to provide to the central analysis team, a list of HRC variant ids
+passing imputation quality control. This list will be used along with the lists
+from all partners to ensure that the variants used for PCA across all cohorts
+will be present across all partners:
+
+```
+for CHR in `seq 1 22`
+do
+  bcftools view \
+    --format '%CHROM:%POS' \
+    --include 'INFO/R2>0.3' > \
+      COHORT_HRC_chr${CHR}_variant.ids &
+done
+```
+
+The files `COHORT_HRC_chr*_variant.ids` should be provided to the central 
+analysis team.
+
+## 1.2 Poorly imputed variant filtering and conversion to PLINK
 
 In the following, we exclude imputed variants with imputation score 
 (R<sup>2</sup) less than 0.3. This is done in parallel (per chromosome) where
@@ -730,7 +750,7 @@ do
 done
 ```
 
-## 1.2 Post-imputation QC with PLINK
+## 1.3 Post-imputation QC with PLINK
 
 We follow most steps performed in the pre-imputation QC, specifically:
 
@@ -747,7 +767,7 @@ For sample filters:
 3. Removal of possible gender mismatches
 4. PCA: outlier removal
 
-### 1.2.1 Genome-wide QC
+### 1.3.1 Genome-wide QC
 
 As in pre-imputation. we sequentially apply variant and sample filters.
 
@@ -830,7 +850,7 @@ Principal Component Analysis
 
 *WIP*
 
-### 1.2.2 QC per chromosome and sample
+### 1.3.2 QC per chromosome and sample
 
 First, we calculate heterozygosities per chromosome:
 
@@ -1075,7 +1095,7 @@ Principal Component Analysis
 
 *WIP*
 
-## 1.3 Non-genetic related sample exclusions
+## 1.4 Non-genetic related sample exclusions
 
 Individuals of all age groups will be included in the analyses. However, the
 following samples should also be excluded from any analyses:
@@ -1088,7 +1108,7 @@ condition that significantly alters normal body weight will be excluded.
 **IMPORTANT**: Analyses will take place separately for children/adolescents <18 
 years old and adults older than 18 years old.
 
-## 1.4 Principal Component projections
+## 1.5 Principal Component projections
 
 The central analysis team will provide three files based on Principal Component
 Analysis of the current 1000 genomes data. These files will be:
@@ -1105,7 +1125,9 @@ used with the files `loads_1000g.txt` and `means_1000g.txt` along with the
 projection functionality of `flashpca` to create the PC covariates for your
 cohort. The PC projections have to be provided to the central analysis team.
 
-**IMPORTANT**: It is **your** responsibility to make sure that **all** the 
+**IMPORTANT**: Although the central analysis team will make sure that the 
+variants  used for PCA projections are common across all partners (see step 1.1
+above), it remains **your** responsibility to make sure that **all** the 
 variants in the provided file `pca_variants.txt` are present in your cohort. If
 the cohort is not very small and has been imputed with HRC panel, this should
 not be a problem. Otherwise, please contact the central analysis team 
@@ -1226,7 +1248,8 @@ plus the PCs. Based on the accompanying toy dataset from HUA, we provide an
 example for case (i).
 
 For the covariate file, we need the phenotypes as well as the PCs. The PCs will
-be provided by the CAT. For this example, we calculate 10 PCs with PLINK.
+be provided by the central analysis team. For this example, we calculate 10 PCs
+with PLINK.
 
 Firstly, perform pruning (will be done based on the reference panel for the
 canonical analysis):
@@ -1342,10 +1365,14 @@ The summary statistics are in `test_bmi_out_firth_bmi.regenie`.
 **NOTE**: 
 
 1. All the parameters will be present in the final analysis plan and decided by
-the CAT.
+the central analysis team.
 2. We used `--ignore-pred` here because our sample for Step 1 is too small to 
 produce whole genome predictions required by `regenie`. It should **not** be the
 case with real data.
+
+## 2.3 Analysis with GCTA
+
+*WIP*
 
 ## Notes
 

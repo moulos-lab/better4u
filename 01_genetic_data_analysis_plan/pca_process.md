@@ -39,21 +39,23 @@ wget ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/technical/reference/human_g1k_v37.
 
 ## 3. Convert the 1000 Genomes files to BCF
 
-In the following we:
+In the following we are creating a first set of BCF files from 1000 genomes data
+which is suitable for further dowstreams selection of variants for PCA for the
+BETTER4U cohorts:
 
-* Include only SNPs with MAF > 0.05 (1st pipe)
+* Include only bi-allelic SNPs with MAF > 0.05 (1st pipe)
 * Ensure that multi-allelic calls are split and that indels are left-aligned 
 compared to reference genome (2nd pipe)
-* Set the VCF ID field to a unique value: `CHROM:POS:REF:ALT` (3rd pipe)
+* Set the VCF ID field to the value: `CHROM:POS` (3rd pipe, this is suitable for
+using later with HRC variants as only unique SNPs are contained)
 * Remove duplicates (4th pipe)
 
 Notes:
 
-- `-I +'%CHROM:%POS:%REF:%ALT'` means that unset IDs will be set to 
-`CHROM:POS:REF:ALT*`
+- `-I +'%CHROM:%POS'` means that unset IDs will be set to 
+`CHROM:POS*`
 - `-x ID -I +'%CHROM:%POS:%REF:%ALT'` first erases the current ID and then sets 
-it to `CHROM:POS:REF:ALT*`
-- Consider changing to `+'%CHROM:%POS'` for HRC purposes
+it to `CHROM:POS*`
 
 ```
 for CHR in `seq 1 22`; 
@@ -61,10 +63,11 @@ do
   echo "Converting $CHR"
   
   bcftools view --include 'INFO/AF > 0.05' --types snps \
+    --min-alleles 2 --max-alleles 2 \
     ALL.chr${CHR}.phase3_shapeit2_mvncall_integrated_v5b.20130502.genotypes.vcf.gz | \
   bcftools norm --multiallelics -any --check-ref w \
     --fasta-ref human_g1k_v37.fasta | \
-  bcftools annotate --remove ID --set-id +'%CHROM:%POS:%REF:%ALT' | \
+  bcftools annotate --remove ID --set-id +'%CHROM:%POS' | \
   bcftools norm --output-type b --rm-dup both \
     --output ALL.chr${CHR}.phase3_shapeit2_mvncall_integrated_v5b.20130502.genotypes.bcf;
 done
@@ -75,8 +78,10 @@ Then index:
 ```
 for CHR in `seq 1 22`; 
 do
+  echo "Indexing $CHR"
+  
   bcftools index \    
-    ALL.chr"${CHR}".phase3_shapeit2_mvncall_integrated_v5b.20130502.genotypes.bcf;
+    ALL.chr${CHR}.phase3_shapeit2_mvncall_integrated_v5b.20130502.genotypes.bcf;
 done
 ```
 
@@ -86,25 +91,87 @@ intersect with the HRC panel variants:
 ```
 for CHR in `seq 1 22`; 
 do
+  echo "Getting ids for $CHR"
+  
   bcftools query --format '%CHROM:%POS' \    
-    ALL.chr"${CHR}".phase3_shapeit2_mvncall_integrated_v5b.20130502.genotypes.bcf \
+    ALL.chr${CHR}.phase3_shapeit2_mvncall_integrated_v5b.20130502.genotypes.bcf \
     > ALL.chr${CHR}.variant.ids;
 done
 ```
 
 The above command will probably take some time, so they can be put in a shell
-script and executed with `nohup`.
+script and executed with `nohup`. This script should look like the following 
+(named `1000g2bcf.sh`):
+
+```
+#!/bin/bash
+
+for CHR in `seq 1 22`;
+do
+  echo "Converting $CHR"
+
+  bcftools view --include 'INFO/AF > 0.05' --types snps \
+    --min-alleles 2 --max-alleles 2 \
+    ALL.chr${CHR}.phase3_shapeit2_mvncall_integrated_v5b.20130502.genotypes.vcf.gz | \
+  bcftools norm --multiallelics -any --check-ref w \
+    --fasta-ref human_g1k_v37.fasta | \
+  bcftools annotate --remove ID --set-id +'%CHROM:%POS' | \
+  bcftools norm --output-type b --rm-dup both \
+    --output ALL.chr${CHR}.phase3_shapeit2_mvncall_integrated_v5b.20130502.genotypes.bcf &
+done
+
+wait
+
+for CHR in `seq 1 22`;
+do
+  echo "Indexing $CHR"
+
+  bcftools \
+    index ALL.chr${CHR}.phase3_shapeit2_mvncall_integrated_v5b.20130502.genotypes.bcf &
+done
+
+wait
+
+for CHR in `seq 1 22`;
+do
+  echo "Getting ids for $CHR"
+
+  bcftools query --format '%CHROM:%POS' \
+    ALL.chr${CHR}.phase3_shapeit2_mvncall_integrated_v5b.20130502.genotypes.bcf > \
+      ALL.chr${CHR}.variant.ids &
+done
+```
+
+and the command to execute it:
+
+```
+nohup sh 1000g2bcf.sh > 1000g2bcf.log &
+```
 
 ## 4. Remove any 1000 genomes variants not present in HRC
 
 Firstly, retrieve a list of all the HRC panel variants from [here](#). Then for
-each chromosome we produce a list of common variants (shoule be most of them):
+each chromosome we produce a list of common variants (should be most of them):
 
-Read HRC in R
-Read 1000 in R
-Intersect
-Write final files
-Use below as extract/remove while creating PLINK
+```
+Rscript \
+  -e '{
+    # Chromosomes
+    chrs <- seq_len(22)
+
+    # Make instersections for each chromosome
+    lapply(chrs,function(chr) {
+        message("Finding common variants for chromosome ",chr)
+        hrcVars <- read.table(paste0("chr",chr,"_HRC_ids.txt"))[,1]
+        kg1Vars <- read.table(paste0("ALL.chr",chr,".variant.ids"))[,1]
+        commonVars <- intersect(kg1Vars,hrcVars)
+        writeLines(commonVars,paste0("chr",chr,"_HRC1KG_common.ids"))
+    })
+  }'
+```
+
+The files `chr*_HRC1KG_common.ids` will be used with PLINK to create PLINK files
+for further downstream analysis.
 
 ## 4. Convert the BCF files to PLINK format
 
@@ -114,15 +181,16 @@ operations required for PCA:
 ```
 for CHR in `seq 1 22`
 do
-plink \
-  --bcf ALL.chr"${CHR}".phase3_shapeit2_mvncall_integrated_v5b.20130502.genotypes.bcf \
-  --keep-allele-order \
-  --vcf-idspace-to _ \
-  --const-fid \
-  --allow-extra-chr 0 \
-  --split-x b37 no-fail \
-  --make-bed \
-  --out ALL.chr"${CHR}".phase3_shapeit2_mvncall_integrated_v5b.20130502.genotypes
+  plink \
+    --bcf ALL.chr"${CHR}".phase3_shapeit2_mvncall_integrated_v5b.20130502.genotypes.bcf \
+    --keep-allele-order \
+    --vcf-idspace-to _ \
+    --const-fid \
+    --allow-extra-chr 0 \
+    --split-x b37 no-fail \
+    --extract chr${CHR}_HRC1KG_common.ids \
+    --make-bed \
+    --out ALL.chr${CHR}.phase3_shapeit2_mvncall_integrated_v5b.20130502.genotypes
 done
 ```
 
@@ -131,24 +199,54 @@ done
 Prior to PCA, it is common practice to not use variants in LD, so LD pruning is
 performed.
 
-* `--maf 0.05`, only retains SNPs with MAF greater than 5%.
-* `--indep [window size] [step size/variant count)] [Variance inflation factor (VIF) threshold]` controls the pruning parameters. e.g. indep `50 5 1.5`, 
-generates a list of markers in approximate linkage equilibrium - takes 50 SNPs 
-at a time and then shifts by 5 for the window. VIF (1/(1-r^2)) is the cut-off 
-for linkage disequilibrium.
-
-We split the commands below in two `for` loops so that `&` can be used to easily
-parallelize per chromosome wherever possible:
+* `--indep-pairwise [window size] [step size/variant count)] [R2]` controls the 
+pruning parameters. e.g. indep `50 5 0.9` and generates a list of markers in 
+approximate linkage equilibrium - takes 50 SNPs at a time and then shifts by 5 
+for the window. R2 is the cut-off for linkage disequilibrium.
+* We follow an iterative procedure similar to the
+[FinnGen](https://finngen.gitbook.io/documentation/methods/phewas/quality-checks)
+consortium, where R2 is decreased by a constant step until ~200,000 variants are
+included in the pruned set.
 
 ```
 mkdir pruned
 
+TOTAL=10000000
+R2=0.95
+STEP=0.05
+
+while [ $TOTAL -gt 200000 ]
+do
+  R2=$(echo "$R2-$STEP" | bc)
+  
+    for CHR in `seq 1 22`
+    do
+      plink \
+        --bfile ALL.chr"${CHR}".phase3_shapeit2_mvncall_integrated_v5b.20130502.genotypes \
+        --indep-pairwise 500 50 $R2 \
+        --out ./pruned/ALL.chr"${CHR}".phase3_shapeit2_mvncall_integrated_v5b.20130502.genotypes \
+        --silent &
+    done
+    
+    wait
+  
+    #TOTAL=$(wc -l ./pruned/*.in | grep total | cut -d' ' -f2)
+    TOTAL=$(wc -l ./pruned/*.in | grep total | awk '{print $1}')
+  
+    echo "Parameters --indep-pairwise 500 50 $R2 yield $TOTAL SNPs" >> \
+      pruning.log
+done
+```
+
+The final value of `$TOTAL` is `0.15` and the number of SNPs is 178,135, so we
+perform the final pruning:
+
+```
 for CHR in `seq 1 22`
 do
   plink \
     --bfile ALL.chr"${CHR}".phase3_shapeit2_mvncall_integrated_v5b.20130502.genotypes \
-    --maf 0.05 \
-    --indep 50 5 1.5 \
+    --indep-pairwise 500 50 0.15 \
     --out ./pruned/ALL.chr"${CHR}".phase3_shapeit2_mvncall_integrated_v5b.20130502.genotypes
 done
 
@@ -198,7 +296,7 @@ to create projections of each partner data to the 1000 genomes PCs and these
 will be used as covariates for individual partner cohort analyses. Therefore,
 these files will be distributed to the partners.
 
-8. Create the variant list to distribute to partners
+7. Create the variant list to distribute to partners
 
 ```
 cut -f2 pruned_merged_1000g.bim > pca_variants.txt
@@ -209,11 +307,10 @@ construction of PLINK files to be used for projection.
 
 # Open issues
 
-* The above process produces >700,000 variants for PCA. They may be too many
-for certain smaller cohorts, as because of size, imputation filtering may remove
-a lot of variants. We could use the process described [here](https://finngen.gitbook.io/documentation/methods/phewas/quality-checks).
-* This process will be executed only by the central analysis team? Probably yes,
-and then a list of SNPs will be distributed.
+* We need to make sure that the set of variants for PCA projection exists in all
+cohorts. To this end, step 4 could be expanded to use the intersections of high
+quality HRC variants from each partner which we need to receive (so far only
+from UTARTU - we haven't asked yet).
 
 ### Notes
 
