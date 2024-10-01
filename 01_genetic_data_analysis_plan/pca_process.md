@@ -148,7 +148,24 @@ and the command to execute it:
 nohup sh 1000g2bcf.sh > 1000g2bcf.log &
 ```
 
-## 4. Remove any 1000 genomes variants not present in HRC
+## 4. Prepare a list of common SNPs accross partners
+
+This steps compiles a list of good quality imputed SNPs from all the partner
+cohorts based on information gathered from each partner for the HRC imputed
+SNPs using a script provided in Appendix I. The creation of this list is 
+outlined in the following.
+
+### List of partners with genetic data:
+
+Most partners provided joint array data (possibly different platforms) per 
+study. Some provided imputed data per study and imputed platform. Every imputed
+dataset, either joint or per platform, comprising imputed chromosomes 1 to 22
+was treated as a separate set per partner. Based on this assumption, for each
+partner we received:
+
+
+
+## 5. Remove any 1000 genomes variants not present in HRC imputed cohorts
 
 Firstly, retrieve a list of all the HRC panel variants from [here](#). Then for
 each chromosome we produce a list of common variants (should be most of them):
@@ -173,7 +190,7 @@ Rscript \
 The files `chr*_HRC1KG_common.ids` will be used with PLINK to create PLINK files
 for further downstream analysis.
 
-## 4. Convert the BCF files to PLINK format
+## 6. Convert the BCF files to PLINK format
 
 Next, we convert BCF files to PLINK BED|BIM|FAM format so as to proceed with the
 operations required for PCA:
@@ -194,7 +211,7 @@ do
 done
 ```
 
-## 5. Prune variants from each chromosome
+## 7. Prune variants from each chromosome
 
 Prior to PCA, it is common practice to not use variants in LD, so LD pruning is
 performed.
@@ -260,7 +277,7 @@ do
 done
 ```
 
-## 6. Assemble the pruned SNPs and merge in preparation for PCA
+## 7. Assemble the pruned SNPs and merge in preparation for PCA
 
 Firstly, we collect a merge list file for PLINK:
 
@@ -296,7 +313,7 @@ to create projections of each partner data to the 1000 genomes PCs and these
 will be used as covariates for individual partner cohort analyses. Therefore,
 these files will be distributed to the partners.
 
-7. Create the variant list to distribute to partners
+8. Create the variant list to distribute to partners
 
 ```
 cut -f2 pruned_merged_1000g.bim > pca_variants.txt
@@ -304,6 +321,54 @@ cut -f2 pruned_merged_1000g.bim > pca_variants.txt
 
 The file `pca_variants.txt` will be distributed to the partners for the 
 construction of PLINK files to be used for projection.
+
+# Appendix I
+
+Script provided by Anders Ericsson to extract SNP information and quality scores
+from HRC imputed data:
+
+```
+#!/bin/bash
+#
+# Author: Anders Eriksson (anders.eriksson@ut.ee)
+#
+# Description: Bash script for extracting imputation and other key summary information from VCF files
+# The script will generate a  (gzip compressed) files containing information from the VCF headers 
+# about the meaning of the INFO field variables and, for each genetic variant in the dataset,
+# the chromosome, position, reference genome allele, alternative allele and INFO field
+#
+# Instructions: 
+# 1. Edit the script to set the PP variable to the path to the folder containing the VCF or VCF.gz with the genotype data for your cohort
+# 2. Run the script: bash info_extraction_script.sh
+# 3. Zip the resulting files together, label the zip file clearly with your acronym (e.g. UTARTU for Tartu) 
+#    and upload to the BETTER4 Google drive folder BETTER4U > WPs > WP3 > GWAS > Code
+#
+# Please do not hesitate to contact Anders Eriksson (anders.eriksson@ut.ee) in case of any questions or problems
+#
+# Example output (from UTARTU):
+# $ zcat EstBB_chr1.info.txt.gz 
+# ##INFO=<ID=AF,Number=A,Type=Float,Description="Estimated ALT Allele Frequencies">
+# ##INFO=<ID=IMP,Number=0,Type=Flag,Description="Imputed marker">
+# ##INFO=<ID=AC,Number=A,Type=Integer,Description="Allele count in genotypes">
+# ##INFO=<ID=AN,Number=1,Type=Integer,Description="Total number of alleles in called genotypes">
+# ##INFO=<ID=INFO,Number=1,Type=Float,Description="IMPUTE2 info score">
+# 1 13380   C   G   IMP;AF=0;AN=422518;AC=0;INFO=0.0220531
+# 1 16071   G   A   IMP;AF=0;AN=422518;AC=0;INFO=0.130104
+# 1 16141   C   T   IMP;AF=2.36676e-06;AN=422518;AC=1;INFO=0.0555347
+# 1 16280   T   C   IMP;AF=2.36676e-06;AN=422518;AC=1;INFO=0.197894
+# 1 49298   T   C   IMP;AF=0.766266;AN=422518;AC=323761;INFO=0.247715
+# 1 54353   C   A   IMP;AF=0.000123072;AN=422518;AC=52;INFO=0.178187
+# 1 54564   G   T   IMP;AF=7.10029e-06;AN=422518;AC=3;INFO=0.0864531
+# 1 54591   A   G   IMP;AF=1.89341e-05;AN=422518;AC=8;INFO=0.319276
+# 1 54676   C   T   IMP;AF=0.250243;AN=422518;AC=105732;INFO=0.254523
+
+PP='path to folder containing VCF or VCF.gz files'
+for FILE in `ls $PP/*.vcf $PP/*.vcf.gz`; do
+   FILE2=${FILE##*/}; FILE2=${FILE2%.vcf*}
+   bcftools view -h ${FILE}| grep '##INFO' | gzip -c  > ${FILE2}.info.txt.gz
+   bcftools query -f '%CHROM\t%POS\t%REF\t%ALT\t%INFO\n' ${FILE} | gzip -c  >> ${FILE2}.info.txt.gz
+done
+```
 
 # Open issues
 
