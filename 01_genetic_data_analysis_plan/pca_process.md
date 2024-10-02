@@ -157,13 +157,174 @@ outlined in the following.
 
 ### List of partners with genetic data:
 
+The partners that will provide genetic data are:
+
+- HUA
+- REGIONH
+- MUW
+- UCY
+- UTARTU
+- HMGU
+- VUA
+- TAUH
+- QIMR
+- BIB
+- WIS
+
 Most partners provided joint array data (possibly different platforms) per 
 study. Some provided imputed data per study and imputed platform. Every imputed
 dataset, either joint or per platform, comprising imputed chromosomes 1 to 22
-was treated as a separate set per partner. Based on this assumption, for each
-partner we received:
+was treated as a separate set per partner. Based on this assumption, the 
+following table summarizes what we received:
 
 
+| Partner | Cohort             | Datasets |
+| ------- | ------------------ | -------- |
+| UTARTU  | EstBB              | 1        |
+| HMGU    | GINIplus&LISA      | 1        |
+| TAUH    | ANGES              | 1        |
+| TAUH    | FINCANVAS_HCE      | 1        |
+| TAUH    | FINCANVAS_MC       | 1        |
+| TAUH    | YFS                | 1        |
+| REGIONH | COPSAC2000         | 1        |
+| REGIONH | COPSAC2010         | 1        |
+| REGIONH | COPSAC2010_PARENTS | 1        |
+| MUW     | HPFS               | 6        |
+| MUW     | NHS                | 5        |
+| MUW     | NHS2               | 4        |
+| MUW     | PHS                | 3        |
+| HUA     | MANOLIS            | 1        |
+| HUA     | POMAC              | 1        |
+| HUA     | NAFLD              | 1        |
+| HUA     | TEENAGE            | 1        |
+| HUA     | THISEAS            | 1        |
+| HUA     | IMPROVE            | 1        |
+| HUA     | OSTEOS             | 1        |
+| VUA     | NTR                | 1        |
+
+
+### Common SNP extraction process
+
+The data were retrieved and one directory for each partner was created. Next,
+data for each cohort and dataset were placed inside each partner directory
+without making distinctions (for the purpose of this work) between a cohort with
+one dataset and a cohort with multiple datasets. For example, UTARTU provided 
+one cohort consisting of 1 (merged) dataset, TAUH provided four cohorts 
+consisting of one dataset each, while MUW provided four cohorts comprising 
+multiple dataset each. Each dataset was placed in the directory of each partner
+without any further processing (e.g. merging datasets from MUW), therefore, the
+directory of UTARTU contained one subdirectory, the directory of TAUH contained
+four subdirectories while the directory of MUW contained 18 subdirectories. 
+
+Based on the above assumptions, the following R script:
+
+* Traverses each partner directory and reads the subdirectory contents (partner
+datasets)
+* Filters each dataset according to the Minimac INFO or Beagle R2 score 
+(cutoff: 0.3)
+* Gathers all the good quality SNPs from all individual partner datasets
+* Find the common good SNPs from all partners for each chromosome and writes
+the results.
+
+
+```
+Rscript \
+  -e '{
+    library(parallel)
+
+    QC_CUT <- 0.3
+    partners <- c("HUA","REGIONH","MUW","UCY","UTARTU","HMGU","VUA","TAUH","QIMR",
+        "BIB","WIS")
+
+    mainPath <- "DIRECTORY_STRUCTURE"
+    pat <- ".*[^0-9](1[0-9]|2[0-2]|[1-9])[^0-9].*\\.txt\\.gz$"
+
+    partnerSnps <- finalSnps <- vector("list",length(partners))
+    names(partnerSnps) <- names(finalSnps) <- partners
+    for (p in partners[c(3,5)]) {
+        message("Reading data for partner ",p)
+        if (dir.exists(file.path(mainPath,p))) {
+            pops <- dir(file.path(mainPath,p),full.names=TRUE)
+            pops <- pops[dir.exists(pops)]
+            partnerSnps[[p]] <- lapply(pops,function(x) {
+                message("  Reading dataset ",x)
+                snps <- dir(x,pattern=pat,full.names=TRUE)
+                chrSnps <- mclapply(snps,function(y) {
+                    message("    Reading file ",y)
+                    vars <- read.delim(y,header=FALSE,comment.char="#")
+                    
+                    #message("      Getting metrics")
+                    metricsField <- strsplit(vars[,5],split=";")
+                    metrics <- do.call("rbind",lapply(metricsField,function(z) {
+                        tmp = strsplit(z,split="=")
+                        out = lapply(tmp,function(a) return(as.numeric(a[2])))
+                        names(out) = lapply(tmp,function(a) return(a[1]))
+                        return(unlist(out))
+                    }))
+                    
+                    # We may have INFO, R2 or nothing
+                    qcField <- ifelse("INFO" %in% colnames(metrics),"INFO",
+                        ifelse("R2" %in% colnames(metrics),"R2",NA))
+                    
+                    #message("      Filtering")
+                    if (!is.na(qcField)) {
+                        keep <- metrics[,qcField] > QC_CUT
+                        keepVars <- vars[keep,,drop=FALSE]
+                    }
+                    else
+                        keepVars <- vars
+                    
+                    return(paste(keepVars[,1],keepVars[,2],sep=":"))
+                },mc.cores=22)
+                
+                names(chrSnps) <- unlist(lapply(chrSnps,function(y) {
+                    snp <- strsplit(y[1],":")
+                    return(snp[[1]][1])
+                }))
+                
+                return(chrSnps)
+            })
+            
+            # We now have to apply union for each partner subset
+            allChrs <- unique(unlist(lapply(partnerSnps[[p]],names)))
+            # First create a list with all substudy SNPs for that chromosome
+            finalSnps[[p]] <- lapply(allChrs,function(x) {
+                return(unique(unlist(lapply(partnerSnps[[p]],function(y) {
+                    return(y[[x]])
+                }))))
+            })
+            names(finalSnps[[p]]) <- unlist(lapply(finalSnps[[p]],function(y) {
+                snp <- strsplit(y[1],":")
+                return(snp[[1]][1])
+            }))
+        }
+    }
+    nullPartner <- unlist(lapply(partnerSnps,is.null))
+    finalSnps <- finalSnps[!nullPartner]
+
+    # Now we have a list of final good SNPs per partner and per chromosome. We 
+    # need to intersect good SNPs per chromosome for each partner.
+    allChrs <- unique(unlist(lapply(finalSnps,names),use.names=FALSE))
+    preSnps <- lapply(allChrs,function(x) {
+        return(lapply(finalSnps,function(y) {
+            return(y[[x]])
+        }))
+    })
+    names(preSnps) <- allChrs
+
+    # Final SNPs per chromosome with Reduce
+    theSnps <- lapply(preSnps,function(x) {
+        Reduce("intersect",x)
+    })
+    names(theSnps) <- allChrs
+
+    # Write
+    lapply(names(theSnps),function(n) {
+        fname <- file.path(mainPath,paste0("b4u_chr",n,"_isecqc.ids"))
+        writeLines(theSnps[[n]],fname)
+    })
+  }'
+```
 
 ## 5. Remove any 1000 genomes variants not present in HRC imputed cohorts
 
