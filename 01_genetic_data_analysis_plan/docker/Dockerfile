@@ -148,6 +148,11 @@ RUN apt-get update && apt-get install -y -q \
         SPECTRA_INC=/tools/spectra-0.9.0/include/Spectra
 ENV PATH=/tools/flashpca_2.0:$PATH
 
+# Install lassosum
+RUN sed -i 's/-Werror=format-security/-Wno-format-security/g' /etc/R/Makeconf && \
+    R -e "library(remotes); install_github('tshmak/lassosum@v0.4.5')" && \
+    sed -i 's/-Wno-format-security/-Werror=format-security/g' /etc/R/Makeconf
+
 # Reset frontend to default
 ENV DEBIAN_FRONTEND=teletype
 
@@ -330,6 +335,7 @@ RUN apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 # | statgenGWAS  | 1.0.9   |
 # | rmarkdown    | 2.27    |
 # | SAIGE        | 1.3.6   |
+# | lassosum     | 0.4.5   |
 # ```
 
 # ### All Installed Packages
