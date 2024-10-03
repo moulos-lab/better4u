@@ -165,10 +165,17 @@ RUN apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 # Container Instructions
 # =============================================================================
 
-# # Build Instructions
+# # Download and Build Instructions
+
+# ## Apptainer/Singularity
+# Download and build an Apptainer image from the Docker image on Docker Hub.
+# For convenience put it in the project dir.
+# ```bash
+# apptainer pull docker://stgkionis/better4u 
+# ```
 
 # ## Docker
-# First build the Docker image with a custom tag specified by `-t`.
+# If you need to build the Docker image with a custom tag specified by `-t`.
 # ```bash
 # docker build -t better4u ./
 # ```
@@ -177,22 +184,24 @@ RUN apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 # docker save -o better4u.tar better4u
 # docker load -i better4u.tar
 # ```
-
-# ## Apptainer
-# Then, optionally, build an Apptainer image from the Docker image.
-# For convenience put it in the project dir.
+# Upload to Docker Hub
 # ```bash
-# apptainer build ./better4u.sif docker-daemon:better4u:latest 
+# docker tag better4u stgkionis/better4u
+# docker push stgkionis/better4u
+# ```
+# Download from Docker Hub
+# ```bash
+# docker pull docker://stgkionis/better4u 
 # ```
 
 # # Usage Instructions
 
-# ## For Apptainer
+# ## For Apptainer/Singularity
 # ### Create the Container
 # Create the container with no external network connectivity with `--net --network none`.
 # Do this from the project dir so it is mounted automatically.
 # ```bash
-# apptainer run --net --network none path/to/better4u.sif
+# apptainer run --net --network none ./better4u-latest.sif
 # ```
 
 # ### Execute Commands in the Running Container
