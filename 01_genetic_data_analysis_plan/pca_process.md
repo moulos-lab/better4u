@@ -6,8 +6,9 @@ Calculation of main Principal Components for BETTER4U
 * Panagiotis Moulos (moulos@fleming.gr)
 * Anders Eriksson (anders.eriksson@ut.ee)
 
-The following is based on [this](https://www.biostars.org/p/335605/) tutorial
-from [Kevin Blighe](https://github.com/kevinblighe) in Biostars.
+The following part for performing PCA on 1000 genomes data is based on
+[this](https://www.biostars.org/p/335605/) tutorial from 
+[Kevin Blighe](https://github.com/kevinblighe) in Biostars.
 
 # Prerequisites
 
@@ -451,7 +452,7 @@ do
 done
 ```
 
-## 7. Assemble the pruned SNPs and merge in preparation for PCA
+## 8. Assemble the pruned SNPs and merge in preparation for PCA
 
 Firstly, we collect a merge list file for PLINK:
 
@@ -488,7 +489,7 @@ to create projections of each partner data to the 1000 genomes PCs and these
 will be used as covariates for individual partner cohort analyses. Therefore,
 these files will be distributed to the partners.
 
-8. Create the variant list to distribute to partners
+9. Create the variant list to distribute to partners
 
 ```
 cut -f2 pruned_merged_1000g.bim > pca_variants.txt
@@ -599,24 +600,3 @@ done
 
 We will need to draft an additional process for this as soon as we have some
 results.
-
-##### Split VUA files per chromosome
-
-```
-zcat NTR_MRG18.HRC.hg19.SNP.info.gz | \
-  awk 'NR!=1 {print $3"\t"$4"\t"$5"\t"$6"\tAF="$7";INFO="$8}' | \ 
-  awk '{print > "chr"$1".info.txt"}'
-pigz *.txt
-```
-
-##### Split UH files per chromosome
-
-```
-for FILE in *.txt.gz
-do
-  SAMPLE=`basename $FILE | sed s/FinnTwin_HRC\.//`
-  zcat $FILE | grep -v "#" | \
-    awk '{print $1"\t"$2"\t"$3"\t"$4"\tAF="$5";MAF="$6";INFO="$17}' | \
-    pigz > ../$SAMPLE &
-done
-```
