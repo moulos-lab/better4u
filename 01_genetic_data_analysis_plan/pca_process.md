@@ -341,8 +341,8 @@ population for LD pruning.
 
 ## 5. Remove any 1000 genomes variants not present in HRC imputed cohorts
 
-Firstly, retrieve a list of all the HRC panel variants from [here](#). Then for
-each chromosome we produce a list of common variants (should be most of them):
+We use the list of common SNPs derived above to intersect with 1000 genomes
+SNPs:
 
 ```
 Rscript \
@@ -489,7 +489,7 @@ to create projections of each partner data to the 1000 genomes PCs and these
 will be used as covariates for individual partner cohort analyses. Therefore,
 these files will be distributed to the partners.
 
-9. Create the variant list to distribute to partners
+Finally, create the variant list to distribute to partners
 
 ```
 cut -f2 pruned_merged_1000g.bim > pca_variants.txt
