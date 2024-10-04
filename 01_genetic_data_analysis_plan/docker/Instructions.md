@@ -68,10 +68,11 @@ plink --help
 regenie --help
 gcta64
 snptest -help
-flashpca --help
 MR-MEGA --help
 # Use the utility scripts like this (per documentation):
 R --slave --vanilla < /tools/mrmega/fixP.r
+flashpca --help
+king --help
 ```
 
 ## Tool Versions
@@ -88,6 +89,7 @@ Here are the versions of the tools included in this Docker image:
 | PRSice2    | 2.3.5   |
 | MR-MEGA    | 0.2     |
 | FlashPCA   | 2.0     |
+| KING       | 2.3.2   |
 | R          | 4.4.1   |
 
 ## R Packages
