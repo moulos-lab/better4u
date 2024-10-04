@@ -1,6 +1,11 @@
 Calculation of main Principal Components for BETTER4U
 ================================================================================
 
+### Authors
+
+* Panagiotis Moulos (moulos@fleming.gr)
+* Anders Eriksson (anders.eriksson@ut.ee)
+
 The following is based on [this](https://www.biostars.org/p/335605/) tutorial
 from [Kevin Blighe](https://github.com/kevinblighe) in Biostars.
 
@@ -238,10 +243,11 @@ Rscript \
 
     mainPath <- "DIRECTORY_STRUCTURE"
     pat <- ".*[^0-9](1[0-9]|2[0-2]|[1-9])[^0-9].*\\.txt\\.gz$"
+    pat2 <- ".*(1[0-9]|2[0-2]|[1-9]).*\\.txt\\.gz$"
 
     partnerSnps <- finalSnps <- vector("list",length(partners))
     names(partnerSnps) <- names(finalSnps) <- partners
-    for (p in partners[c(3,5)]) {
+    for (p in partners) {
         message("Reading data for partner ",p)
         if (dir.exists(file.path(mainPath,p))) {
             pops <- dir(file.path(mainPath,p),full.names=TRUE)
@@ -249,16 +255,17 @@ Rscript \
             partnerSnps[[p]] <- lapply(pops,function(x) {
                 message("  Reading dataset ",x)
                 snps <- dir(x,pattern=pat,full.names=TRUE)
+                if (length(snps) == 0)
+                    snps <- dir(x,pattern=pat2,full.names=TRUE)
                 chrSnps <- mclapply(snps,function(y) {
                     message("    Reading file ",y)
                     vars <- read.delim(y,header=FALSE,comment.char="#")
                     
-                    #message("      Getting metrics")
                     metricsField <- strsplit(vars[,5],split=";")
                     metrics <- do.call("rbind",lapply(metricsField,function(z) {
-                        tmp = strsplit(z,split="=")
-                        out = lapply(tmp,function(a) return(as.numeric(a[2])))
-                        names(out) = lapply(tmp,function(a) return(a[1]))
+                        tmp <- strsplit(z,split="=")
+                        out <- lapply(tmp,function(a) return(as.numeric(a[2])))
+                        names(out) <- lapply(tmp,function(a) return(a[1]))
                         return(unlist(out))
                     }))
                     
@@ -266,7 +273,6 @@ Rscript \
                     qcField <- ifelse("INFO" %in% colnames(metrics),"INFO",
                         ifelse("R2" %in% colnames(metrics),"R2",NA))
                     
-                    #message("      Filtering")
                     if (!is.na(qcField)) {
                         keep <- metrics[,qcField] > QC_CUT
                         keepVars <- vars[keep,,drop=FALSE]
@@ -320,11 +326,17 @@ Rscript \
 
     # Write
     lapply(names(theSnps),function(n) {
-        fname <- file.path(mainPath,paste0("b4u_chr",n,"_isecqc.ids"))
+        #fname <- file.path(mainPath,paste0("b4u_chr",n,"_isecqc.ids"))
+        # Or if we have a standard working directory with 1000G data
+        fname <- paste0("b4u_chr",n,"_isecqc.ids")
         writeLines(theSnps[[n]],fname)
     })
   }'
 ```
+
+The above script yields a set of files with SNP ids named `b4u_chr*_isecqc.ids`.
+We will use them to intersect with 1000 genomes SNPs so as to derive and initial
+population for LD pruning.
 
 ## 5. Remove any 1000 genomes variants not present in HRC imputed cohorts
 
@@ -340,7 +352,8 @@ Rscript \
     # Make instersections for each chromosome
     lapply(chrs,function(chr) {
         message("Finding common variants for chromosome ",chr)
-        hrcVars <- read.table(paste0("chr",chr,"_HRC_ids.txt"))[,1]
+        #hrcVars <- read.table(paste0("chr",chr,"_HRC_ids.txt"))[,1]
+        hrcVars <- read.table(paste0("b4u_chr",chr,"_isecqc.ids"))[,1]
         kg1Vars <- read.table(paste0("ALL.chr",chr,".variant.ids"))[,1]
         commonVars <- intersect(kg1Vars,hrcVars)
         writeLines(commonVars,paste0("chr",chr,"_HRC1KG_common.ids"))
@@ -462,7 +475,8 @@ And perform PCA using `flashpca` (the files `loads_1000g.txt` and
 ```
 flashpca_x86-64 \
   --bfile pruned_merged_1000g \
-  --ndim 20 \
+  # --ndim 20 \
+  --ndim 5 \
   --outpc pcs_1000g.txt \
   --outvec eig_1000g.txt \
   --outload loads_1000g.txt \
@@ -533,10 +547,7 @@ done
 
 # Open issues
 
-* We need to make sure that the set of variants for PCA projection exists in all
-cohorts. To this end, step 4 could be expanded to use the intersections of high
-quality HRC variants from each partner which we need to receive (so far only
-from UTARTU - we haven't asked yet).
+No current issue.
 
 ### Notes
 
@@ -588,3 +599,24 @@ done
 
 We will need to draft an additional process for this as soon as we have some
 results.
+
+##### Split VUA files per chromosome
+
+```
+zcat NTR_MRG18.HRC.hg19.SNP.info.gz | \
+  awk 'NR!=1 {print $3"\t"$4"\t"$5"\t"$6"\tAF="$7";INFO="$8}' | \ 
+  awk '{print > "chr"$1".info.txt"}'
+pigz *.txt
+```
+
+##### Split UH files per chromosome
+
+```
+for FILE in *.txt.gz
+do
+  SAMPLE=`basename $FILE | sed s/FinnTwin_HRC\.//`
+  zcat $FILE | grep -v "#" | \
+    awk '{print $1"\t"$2"\t"$3"\t"$4"\tAF="$5";MAF="$6";INFO="$17}' | \
+    pigz > ../$SAMPLE &
+done
+```

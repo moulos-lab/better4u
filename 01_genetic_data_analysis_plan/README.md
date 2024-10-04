@@ -1,6 +1,11 @@
 First Analysis Plan for Genetic Data - WP3
 ================================================================================
 
+### Authors
+
+* Panagiotis Moulos (moulos@fleming.gr)
+* René Pool (r.pool@vu.nl)
+
 # Introduction
 
 For the start of WP3 of BETTER4U, we will perform genome-wide association 
@@ -18,6 +23,7 @@ If you have any questions, please email all the following individuals:
 * Jon Anders Eriksson (anders.eriksson@ut.ee)
 * Nana Kalafati (nkalafati@gmail.com)
 * Panagiotis Moulos (moulos@fleming.gr)
+* René Pool (r.pool@vu.nl)
 * ...Others
 
 
@@ -109,6 +115,7 @@ The tools will also be distributed as Docker/Singularity images.
 |PLINK|1.90|[https://www.cog-genomics.org/plink/](https://www.cog-genomics.org/plink/)|[download](https://s3.amazonaws.com/plink1-assets/plink_linux_x86_64_20231211.zip)|
 |REGENIE|3.5|[https://rgcgithub.github.io/regenie/](https://rgcgithub.github.io/regenie/)|[download](https://github.com/rgcgithub/regenie/releases/download/v3.5/regenie_v3.5.gz_x86_64_Linux.zip)|
 |GCTA|1.94.1|[https://yanglab.westlake.edu.cn/software/gcta/](https://yanglab.westlake.edu.cn/software/gcta/)|[download](https://yanglab.westlake.edu.cn/software/gcta/bin/gcta-1.94.1-linux-kernel-3-x86_64.zip)|
+|KING|2.3.2|[https://kingrelatedness.com/](https://kingrelatedness.com/)|[download](https://kingrelatedness.com/Linux-king.tar.gz)|
 |MR-MEGA|0.2|[https://genomics.ut.ee/en/tools](https://genomics.ut.ee/en/tools)|[download](https://tools.gi.ut.ee/tools/MR-MEGA_v0.2.zip)|
 
 # 0. Pre-imputation
@@ -307,7 +314,7 @@ The following sample filters are recommended:
 
 1. Sample call rate: > 95%
 2. Heterozygosity: median(heterozygosity) &plusmn; 3 &times; IQR
-3. Identity By Descent: > 0.5
+3. Identity By Descent: > 0.5 (optional)
 4. PCA: outlier removal
 
 Below, we sequentially apply variant and sample filters according to widely
@@ -434,6 +441,28 @@ plink \
   --bfile COHORT_filtered \
   --out COHORT_ibd \
   --remove ibd_samples_remove.txt \
+  --make-bed
+```
+
+Alternatively, IBD analysis may be performed with KING (prior to LD pruning):
+
+```
+king \
+  -b COHORT_filtered.bed \
+  --unrelated \
+  --degree 2 \
+  --prefix individuals_
+```
+
+The aforementioned command will create the file `individuals_unrelated.txt` 
+which we use with PLINK to create the dataset with related individuals removed
+(optional).
+
+```
+plink \
+  --bfile COHORT_filtered \
+  --keep individuals_unrelated.txt \
+  --out COHORT_ibd \
   --make-bed
 ```
 
@@ -705,6 +734,8 @@ done
 The files `COHORT_HRC_chr*_variant.ids` should be provided to the central 
 analysis team.
 
+**NOTE:** This step has been performed during WP3 discussions.
+
 ## 1.2 Poorly imputed variant filtering and conversion to PLINK
 
 In the following, we exclude imputed variants with imputation score 
@@ -845,10 +876,33 @@ plink \
   --make-bed
 ```
 
+Alternatively, IBD analysis may be performed with KING (prior to LD pruning):
 
-Principal Component Analysis
+```
+king \
+  -b COHORT_imputed_tmp.bed \
+  --unrelated \
+  --degree 2 \
+  --prefix individuals_
+```
 
-*WIP*
+The aforementioned command will create the file `individuals_unrelated.txt` 
+which we use with PLINK to create the dataset with related individuals removed
+(optional).
+
+```
+plink \
+  --bfile COHORT_filtered \
+  --keep individuals_unrelated.txt \
+  --out COHORT_imputed_filtered \
+  --make-bed
+```
+
+#### Principal Component Analysis
+
+As per latest WP3 discussions, each partner is responsible for removing outlier
+based on PCA projections on the 1000 genomes project data. See also the file
+`pca_variants.txt` in section 1.5 below.
 
 ### 1.3.2 QC per chromosome and sample
 
@@ -1091,9 +1145,11 @@ done
 plink --merge-list mergelist.txt --out COHORT_imputed_filtered_merged
 ```
 
-Principal Component Analysis
+#### Principal Component Analysis
 
-*WIP*
+As per latest WP3 discussions, each partner is responsible for removing outlier
+based on PCA projections on the 1000 genomes project data. See also the file
+`pca_variants.txt` in section 1.5 below.
 
 ## 1.4 Non-genetic related sample exclusions
 
@@ -1155,6 +1211,10 @@ flashpca \
   --verbose
 ```
 
+**NOTE**: As per latest WP3 discussions, the following procedure is optional for
+each partner as long as each partner ensures that proper PCA covariates will be
+taken into account in GWAS, i.e. possible outliers excluded.
+
 We are now editing the file `projections.txt` so as to:
 
 1. Anonymize the individual ids accompanying the PC projections
@@ -1210,9 +1270,6 @@ the same ids can be regenerated in case of loss.
 # 2. Genome-wide association analyses
 
 ## 2.1 General
-
-Please use the XXX script to perform the genome-wide association analyses 
-required herein. 
 
 * An additive model of inheritance will be assumed.
 * In case you have a case-control study, and the disease phenotype is associated 
@@ -1273,7 +1330,8 @@ plink \
 
 The output is written to `toy.eigenvec`. This is just for example purposes. 
 During the normal execution, you will not calculate PCs with PLINK but rather 
-use the PC projections file provided by the central analysis team. We then
+use the PC projections file provided by the central analysis team or created by
+yourself using the set of SNPs provided by the central analysis team. We then
 construct the covariates and phenotype file:
 
 ```
@@ -1372,7 +1430,186 @@ case with real data.
 
 ## 2.3 Analysis with GCTA
 
-*WIP*
+## 2.3.1 Preparation of the Genetic Relationships Matrix (GRM)
+
+The GRM is a prerequisite for using GCTA and can be constructed with the GCTA
+software taking into account sample relatedness as calculated with the KING
+software. We assume the toy dataset provided by HUA. If related individuals
+have been removed based on KING or PLINK IBD, then Step 1 below can be 
+excluded by also removing the `--keep individuals_unrelated.txt` PLINK argument
+in Step 2.
+
+### Step 1: Find related individuals with KING
+
+```
+king \
+  -b toyf.bed \
+  --unrelated \
+  --degree 2 \
+  --prefix individuals_
+```
+
+### Step 2: Conduct LD-pruning excluding related samples
+
+```
+plink \
+  --bfile toyf \
+  --keep individuals_unrelated.txt \
+  --indep 50 5 2 \
+  --out toyf_pruned
+```
+
+### Step 3: Create PLINK files with the pruned variants and *all* samples
+
+```
+plink \
+  --bfile toyf \
+  --extract toyf_pruned.prune.in \
+  --out toyf_for_grm \
+  --make-bed
+```
+
+### Step 4: Create GRM and GRM sparse matrices
+
+`--thread-num` can be set according to the system of each user. We set a small
+number for the toy dataset.
+
+```
+gcta64 \
+  --bfile toyf_for_grm \
+  --make-grm \
+  --autosome \
+  --thread-num 4 \
+  --out toyf_grm
+```
+
+This will produce the files `toyf_grm.grm.bin`, `toyf_grm.grm.id`, 
+`toyf_grm.grm.N.bin`.
+
+```
+gcta64 \
+  --grm toyf_grm \
+  --make-bK-sparse 0.05 \
+  --out toyf_grm_sparse
+```
+
+## 2.3.2 Preparation of covariate and phenotype files
+
+The covariate files should include covariates for each analysis mentioned above
+plus the PCs. Based on the accompanying toy dataset from HUA, we provide an
+example for case (i).
+
+The covariate files in the case of GCTA must be separated in categorical and
+quantitative covriates. For the covariate file, we need the phenotypes as well 
+as the PCs. The PCs will be provided by the central analysis team or calculated
+by you with the SNPs and 1000 genomes loadings provided by the central analysis
+team. For this example only, we calculate 10 PCs with PLINK.
+
+Firstly, perform pruning (will be done based on the reference panel for the
+canonical analysis):
+
+```
+plink \
+  --bfile toy \
+  --out toy \
+  --indep-pairwise 50 5 0.2
+```
+
+Then, calculate 10 PCs exluding the pruned SNPs:
+
+```
+plink \
+  --bfile toy \
+  --out toy \
+  --pca 10 header \
+  --exclude toy.prune.out
+```
+
+The output is written to `toy.eigenvec`. This is just for example purposes. 
+During the normal execution, you will not calculate PCs with PLINK but rather 
+use the PC projections file provided by the central analysis team or created by
+yourself using the set of SNPs provided by the central analysis team. We then
+construct the covariates (categorical + quantitative) and phenotype file:
+
+```
+Rscript \
+  -e '{
+    # Read all phenotypes
+    phen <- read.delim("toy.txt")
+    rownames(phen) <- phen$iid
+    phen$age2 <- phen$age^2
+    
+    # Construct 1st part of quantitative covariates files
+    qcovs <- data.frame(
+      FID=phen$fid,
+      IID=phen$iid,
+      age=phen$age,
+      age2=phen$age2
+    )
+    
+    # 2nd part - PCs
+    pcs <- read.table("toy.eigenvec",header=TRUE)
+    rownames(pcs) <- pcs$IID
+    pcs <- pcs[rownames(phen),]
+    pcs <- pcs[,grep("PC",colnames(pcs))]
+    qcovs <- cbind(qcovs,pcs)
+    
+    # Write the quantitative covariates file
+    write.table(qcovs,file="toy_gcta_q_covariates.txt",row.names=FALSE,
+        quote=FALSE)
+    
+    # Construct the categorical covariates files
+    ccovs <- data.frame(
+      FID=phen$fid,
+      IID=phen$iid,
+      sex=phen$sex
+    )
+    
+    # Write the categorical covariates file
+    write.table(ccovs,file="toy_gcta_c_covariates.txt",row.names=FALSE,
+        quote=FALSE)
+    
+    # Construct the phenotype file
+    resp <- data.frame(
+      FID=phen$fid,
+      IID=phen$iid,
+      bmi=phen$bmi_b
+    )
+    write.table(resp,file="toy_gcta_phenotype.txt",row.names=FALSE,
+        quote=FALSE)
+  }'
+```
+
+## 2.3.3 Execute GCTA fastGWA with the toy dataset
+
+Step 0: exclude monomorphic and low variance SNPs from the toy dataset as they
+cause `regenie` to crash. Generally, QC **must** be performed prior to running
+`regenie`:
+
+```
+plink \
+  --bfile toy \
+  --out toyf \
+  --make-bed \
+  --maf 0.01
+```
+
+Perform GWAS
+
+```
+gcta64 \
+  --bfile toyf \
+  --grm-sparse toyf_grm_sparse \
+  --est-vg HE \
+  --pheno toy_gcta_phenotype.txt \
+  --qcovar toy_gcta_q_covariates.txt \
+  --covar toy_gcta_c_covariates.txt \
+  --fastGWA-mlm \
+  --thread-num 4 \
+  --out fit_gcta_bmi_out
+```
+
+The summary statistics are in `fit_gcta_bmi_out.fastGWA`.
 
 ## Notes
 
@@ -1416,9 +1653,6 @@ and you can safely close the session and check e.g. the next day.
 
 ## Open issues
 
-* Which program will be used for GWAS? We have drafted examples using REGENIE.
-It was suggested by R. Pool to use GCTA as SAIGE and REGENIE do not behave well
-with twins.
 * "Anonymization" of PCs should be checked/verified.
 * Do we need also `FID` for the clustering of projected PCs? If yes the process
 above must be amended.
