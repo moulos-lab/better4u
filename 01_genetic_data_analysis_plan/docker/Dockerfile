@@ -153,6 +153,12 @@ RUN sed -i 's/-Werror=format-security/-Wno-format-security/g' /etc/R/Makeconf &&
     R -e "library(remotes); install_github('tshmak/lassosum@v0.4.5')" && \
     sed -i 's/-Wno-format-security/-Werror=format-security/g' /etc/R/Makeconf
 
+# Install KING
+RUN wget https://www.kingrelatedness.com/Linux-king.tar.gz && \
+    tar -xzvf Linux-king.tar.gz && \
+    rm Linux-king.tar.gz && \
+    mv king /usr/local/bin/
+
 # Reset frontend to default
 ENV DEBIAN_FRONTEND=teletype
 
