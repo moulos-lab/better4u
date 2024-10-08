@@ -4,16 +4,16 @@ Container Instructions
 # Download and Build Instructions
 
 ## Apptainer/Singularity
-Download and build an Apptainer image from the Docker image on Docker Hub.
+Download and build an Apptainer/Singularity compatible image from the Docker image on Docker Hub.
 For convenience put it in the project dir.
 ```bash
-apptainer pull docker://stgkionis/better4u 
+singularity pull docker://stgkionis/better4u 
 ```
 
 ## Docker
 Download from Docker Hub.
 ```bash
-docker pull docker://stgkionis/better4u 
+docker pull stgkionis/better4u 
 ```
 
 # Usage Instructions
@@ -23,7 +23,7 @@ docker pull docker://stgkionis/better4u
 Create the container with no external network connectivity with `--net --network none`.
 Do this from the project dir so it is mounted automatically.
 ```bash
-apptainer run --net --network none ./better4u-latest.sif
+singularity run --net --network none ./better4u_latest.sif
 ```
 
 ### Execute Commands in the Running Container
@@ -34,7 +34,7 @@ Simply run commands as you would in any interactive shell and `exit` when finish
 Create the container with no external network connectivity with `--network none`
 and mount the project dir.
 ```bash
-docker run -t -d --name better4u -v /path/to/project/dir:/app --network none better4u
+docker run -t -d --name better4u -v <PROJECT_PATH>:/app --network none stgkionis/better4u
 ```
 
 ### Start the Container
@@ -53,6 +53,12 @@ docker exec better4u <COMMAND>
 Stop the container when you're done.
 ```bash
 docker stop better4u
+```
+
+### Remove the Container
+If no longer needed.
+```bash
+docker rm better4u
 ```
 
 # Example Commands for Tools
