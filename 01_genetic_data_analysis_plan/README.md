@@ -118,6 +118,18 @@ The tools will also be distributed as Docker/Singularity images.
 |KING|2.3.2|[https://kingrelatedness.com/](https://kingrelatedness.com/)|[download](https://kingrelatedness.com/Linux-king.tar.gz)|
 |MR-MEGA|0.2|[https://genomics.ut.ee/en/tools](https://genomics.ut.ee/en/tools)|[download](https://tools.gi.ut.ee/tools/MR-MEGA_v0.2.zip)|
 
+## Apptainer/Singularity usage
+1. Navigate to the project directory.
+2. Download the latest version of the image created for the project:
+```bash
+singularity pull docker://stgkionis/better4u
+```
+4. Start the image with:
+```bash
+singularity run --net --network none ./better4u_latest.sif
+```
+6. Run the commands as below.
+
 # 0. Pre-imputation
 
 In the case that genotypic data are not already imputed in HRC version r1.1 or
