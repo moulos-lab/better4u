@@ -892,7 +892,7 @@ which we use with PLINK to create the dataset with related individuals removed
 
 ```
 plink \
-  --bfile COHORT_filtered \
+  --bfile COHORT_imputed \
   --keep individuals_unrelated.txt \
   --out COHORT_imputed_filtered \
   --make-bed
