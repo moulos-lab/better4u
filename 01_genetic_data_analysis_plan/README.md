@@ -315,7 +315,7 @@ The following sample filters are recommended:
 1. Sample call rate: > 95%
 2. Heterozygosity: median(heterozygosity) &plusmn; 3 &times; IQR
 3. Identity By Descent: > 0.5 (optional)
-4. PCA: outlier removal
+4. PCA: outlier removal (optional)
 
 Below, we sequentially apply variant and sample filters according to widely
 accepted [best practices](https://onlinelibrary.wiley.com/doi/10.1002/sim.6605).

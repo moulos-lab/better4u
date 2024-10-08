@@ -238,9 +238,11 @@ Rscript \
   -e '{
     library(parallel)
 
-    QC_CUT <- 0.3
-    partners <- c("HUA","REGIONH","MUW","UCY","UTARTU","HMGU","VUA","TAUH","QIMR",
-        "BIB","WIS")
+    #QC_CUT <- 0.3
+    QC_CUT_R2 <- 0.8
+    QC_CUT_INFO <- 0.9
+    partners <- c("HUA","REGIONH","MUW","UCY","UTARTU","HMGU","VUA","TAUH",
+        "QIMR","BIB","WIS")
 
     mainPath <- "DIRECTORY_STRUCTURE"
     pat <- ".*[^0-9](1[0-9]|2[0-2]|[1-9])[^0-9].*\\.txt\\.gz$"
@@ -275,7 +277,12 @@ Rscript \
                         ifelse("R2" %in% colnames(metrics),"R2",NA))
                     
                     if (!is.na(qcField)) {
-                        keep <- metrics[,qcField] > QC_CUT
+                        if (qcField == "INFO")
+                            keep <- metrics[,qcField] > QC_CUT_INFO & 
+                                !is.na(metrics[,qcField])
+                        else if (qcField == "R2")
+                            keep <- metrics[,qcField] > QC_CUT_R2 & 
+                                !is.na(metrics[,qcField])
                         keepVars <- vars[keep,,drop=FALSE]
                     }
                     else
