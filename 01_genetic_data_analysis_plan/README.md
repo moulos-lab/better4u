@@ -1283,6 +1283,34 @@ included individuals returned by the central analysis team (if anyone excluded)
 for the subsequent site-specific GWAS. The `set.seed()` function ensures that
 the same ids can be regenerated in case of loss.
 
+#### Plotting projections
+
+Plot the first 3 PCs from the `COHORT.eigenvec` file:
+
+```
+Rscript \
+  -e '{
+    data <- read.table("COHORT.eigenvec", header = TRUE)
+    pcs <- data[, c("PC1", "PC2", "PC3")]
+    
+    # Save the plots as a PNG file
+    png("PC_plots.png", width = 1200, height = 400)  # Adjust width/height as needed
+    
+    # Set up the plotting window to show three plots side by side
+    par(mfrow = c(1, 3))
+    
+    plot(pcs$PC1, pcs$PC2, col = "blue", pch = 19,
+         main = "PC1 vs PC2", xlab = "PC1", ylab = "PC2")
+    plot(pcs$PC1, pcs$PC3, col = "green", pch = 19,
+         main = "PC1 vs PC3", xlab = "PC1", ylab = "PC3")
+    plot(pcs$PC2, pcs$PC3, col = "red", pch = 19,
+         main = "PC2 vs PC3", xlab = "PC2", ylab = "PC3")
+    
+    # Close the PNG device
+    dev.off()
+  }'
+```
+
 # 2. Genome-wide association analyses
 
 ## 2.1 General
