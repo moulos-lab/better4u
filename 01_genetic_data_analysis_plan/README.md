@@ -129,6 +129,10 @@ singularity pull docker://stgkionis/better4u
 singularity run --net --network none ./better4u_latest.sif
 ```
 6. Run the commands as below.
+7. Exit from the image when finished:
+```bash
+exit
+```
 
 # 0. Pre-imputation
 
