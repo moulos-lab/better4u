@@ -211,6 +211,8 @@ following table summarizes what we received:
 
 ### Common SNP extraction process
 
+#### Original process
+
 The data were retrieved and one directory for each partner was created. Next,
 data for each cohort and dataset were placed inside each partner directory
 without making distinctions (for the purpose of this work) between a cohort with
@@ -346,6 +348,32 @@ The above script yields a set of files with SNP ids named `b4u_chr*_isecqc.ids`.
 We will use them to intersect with 1000 genomes SNPs so as to derive and initial
 population for LD pruning.
 
+#### Process by A. Eriksson
+
+Τhe imputation quality information provided by the partners was processed and 
+resulted in a set of SNPs that can serve as a starting point for LD pruning and 
+PCA loading calculations. Biallelic SNPs in the 1000 Genomes Phase 3 dataset 
+with MAF >= 5% were selected. Then, the ATLAS and IMPROVE HUA cohorts were 
+excluded, filtered for sites where we have data for all other cohorts, and 
+further filtered for sites where we have R2>0.8 or Impute2 INFO score > 0.9. 
+This yielded 1,923,057 SNPs that are well spread out over the genome. You can 
+find these SNPS (in the form of Chr, Pos, Ref, Alt) in the file `pcapos.txt.zip` 
+on [Google Drive](https://drive.google.com/file/d/1DApJrIG5CDI8C5U8yQFgYwHoCE7O0Qz0/view?usp=drive_link).
+
+After downloading this file, we split per chromosome and select only SNP names
+in the form of `chr:pos`:
+
+```
+awk 'NR!=1 {print $1"\t"$2}' pcapos.txt | awk '{print > "chr"$1"_HRC1KG_common.tmp"}'
+for FILE in *_HRC1KG_common.tmp
+do
+    NAME=`echo $FILE | sed s/\.tmp/\.ids/`
+    awk '{print $1":"$2}' $FILE > $NAME &
+done
+```
+
+If we follow A. Eriksson process, step 5 below is **omitted**.
+
 ## 5. Remove any 1000 genomes variants not present in HRC imputed cohorts
 
 We use the list of common SNPs derived above to intersect with 1000 genomes
@@ -437,7 +465,7 @@ do
 done
 ```
 
-The final value of `$TOTAL` is `0.15` and the number of SNPs is 178,135, so we
+The final value of `$R2` is `0.55` and the number of SNPs is 182,683, so we
 perform the final pruning:
 
 ```
@@ -445,7 +473,7 @@ for CHR in `seq 1 22`
 do
   plink \
     --bfile ALL.chr"${CHR}".phase3_shapeit2_mvncall_integrated_v5b.20130502.genotypes \
-    --indep-pairwise 500 50 0.15 \
+    --indep-pairwise 500 50 0.55 \
     --out ./pruned/ALL.chr"${CHR}".phase3_shapeit2_mvncall_integrated_v5b.20130502.genotypes
 done
 
@@ -455,7 +483,7 @@ do
     --bfile ALL.chr"${CHR}".phase3_shapeit2_mvncall_integrated_v5b.20130502.genotypes \
     --extract ./pruned/ALL.chr"${CHR}".phase3_shapeit2_mvncall_integrated_v5b.20130502.genotypes.prune.in \
     --make-bed \
-    --out ./pruned/ALL.chr"${CHR}".phase3_shapeit2_mvncall_integrated_v5b.20130502.genotypes
+    --out ./pruned/ALL.chr"${CHR}".phase3_shapeit2_mvncall_integrated_v5b.20130502.genotypes &
 done
 ```
 
@@ -483,8 +511,7 @@ And perform PCA using `flashpca` (the files `loads_1000g.txt` and
 ```
 flashpca_x86-64 \
   --bfile pruned_merged_1000g \
-  # --ndim 20 \
-  --ndim 5 \
+  --ndim 20 \
   --outpc pcs_1000g.txt \
   --outvec eig_1000g.txt \
   --outload loads_1000g.txt \
