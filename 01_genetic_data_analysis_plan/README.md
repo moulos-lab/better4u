@@ -1285,7 +1285,7 @@ the same ids can be regenerated in case of loss.
 
 #### Plotting projections
 
-Plot the first 3 PCs from the `COHORT.eigenvec` file:
+Plot the first 3 PCs from the `COHORT.eigenvec` file against each other:
 
 ```
 Rscript \
