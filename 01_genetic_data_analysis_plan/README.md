@@ -20,12 +20,11 @@ the meta-analysis will be performed.
 
 If you have any questions, please email all the following individuals: 
 
-* Jon Anders Eriksson (anders.eriksson@ut.ee)
-* Nana Kalafati (nkalafati@gmail.com)
 * Panagiotis Moulos (moulos@fleming.gr)
 * René Pool (r.pool@vu.nl)
+* Jon Anders Eriksson (anders.eriksson@ut.ee)
+* Nana Kalafati (nkalafati@gmail.com)
 * ...Others
-
 
 **TIMELINE FOR COMPLETION OF COHORT-SPECIFIC ANALYSES** 
 
@@ -66,17 +65,17 @@ These environments are private, so please share your github ID with XXX (XXX).
 
 Due to the cohorts' diversity in measurements, we would like to ask for the 
 analysts to only include data measured using the following measurement units:
+
 1. For BMI, please use kg/m<sup>2</sup> and two decimals (e.g. `23.87`). For BMI
 in children and adolescents, please replace BMI with zBMI. You will find 
 attached the relevant syntax for calculating zBMI based on 
 [Cole and Lobstein et al., 2012](https://pubmed.ncbi.nlm.nih.gov/22715120/) in 
-the XXX script. 
+the XXX script.
 2. For weight, please use as unit kg with two decimals. Only perform analyses in
 the sample of age greater than 18 years old.
 3. For height, please use as unit m in two decimals. Only perform analyses in 
 the sample of age greater than 18 years.
 4. For sex, please use the code: 1=man, 2=woman.
-
 
 We thank you for your cooperation.
 
@@ -119,17 +118,24 @@ The tools will also be distributed as Docker/Singularity images.
 |MR-MEGA|0.2|[https://genomics.ut.ee/en/tools](https://genomics.ut.ee/en/tools)|[download](https://tools.gi.ut.ee/tools/MR-MEGA_v0.2.zip)|
 
 ## Apptainer/Singularity usage
-1. Navigate to the project directory.
+
+1. Navigate to the project directory or where you wish to execute the analysis.
 2. Download the latest version of the image created for the project:
+
 ```bash
 singularity pull docker://stgkionis/better4u
 ```
-4. Start the image with:
+
+4. Start the Singularity image with:
+
 ```bash
 singularity run --net --network none ./better4u_latest.sif
 ```
-6. Run the commands as below.
-7. Exit from the image when finished:
+
+6. Run the commands as per the analysis plan.
+
+7. Exit from the image when finished.
+
 ```bash
 exit
 ```
@@ -1285,31 +1291,33 @@ the same ids can be regenerated in case of loss.
 
 #### Plotting projections
 
-Plot the first 3 PCs from the `COHORT.eigenvec` file against each other:
+Plot the first 3 PCs from the `shared_projections.txt` file against each other:
 
 ```
 Rscript \
   -e '{
-    data <- read.table("COHORT.eigenvec", header = TRUE)
-    pcs <- data[, c("PC1", "PC2", "PC3")]
+    data <- read.table("shared_projections.txt",header=TRUE)
+    pcs <- data[,c("PC1","PC2","PC3")]
     
     # Save the plots as a PNG file
-    png("PC_plots.png", width = 1200, height = 400)  # Adjust width/height as needed
+    png("PC_plots.png",width=1200,height=400) # Adjust width/height as needed
     
     # Set up the plotting window to show three plots side by side
-    par(mfrow = c(1, 3))
+    par(mfrow=c(1,3))
     
-    plot(pcs$PC1, pcs$PC2, col = "blue", pch = 19,
-         main = "PC1 vs PC2", xlab = "PC1", ylab = "PC2")
-    plot(pcs$PC1, pcs$PC3, col = "green", pch = 19,
-         main = "PC1 vs PC3", xlab = "PC1", ylab = "PC3")
-    plot(pcs$PC2, pcs$PC3, col = "red", pch = 19,
-         main = "PC2 vs PC3", xlab = "PC2", ylab = "PC3")
+    plot(pcs$PC1,pcs$PC2,col="blue",pch=19,main="PC1 vs PC2",
+         xlab="PC1",ylab="PC2")
+    plot(pcs$PC1,pcs$PC3,col="green",pch=19,main="PC1 vs PC3",
+         xlab="PC1",ylab="PC3")
+    plot(pcs$PC2,pcs$PC3,col="red",pch=19,main="PC2 vs PC3",
+         xlab="PC2",ylab="PC3")
     
     # Close the PNG device
     dev.off()
   }'
 ```
+
+The file `PC_plots.png` should be returned to the central analysis team.
 
 # 2. Genome-wide association analyses
 
@@ -1626,34 +1634,57 @@ Rscript \
 
 ## 2.3.3 Execute GCTA fastGWA with the toy dataset
 
-Step 0: exclude monomorphic and low variance SNPs from the toy dataset as they
-cause `regenie` to crash. Generally, QC **must** be performed prior to running
-`regenie`:
+Step 1: Create the null model using pruned SNPs with GCTA
 
 ```
 plink \
   --bfile toy \
-  --out toyf \
-  --make-bed \
-  --maf 0.01
-```
+  --out toy_null \
+  --exclude toy.prune.out \
+  --make-bed
 
-Perform GWAS
-
-```
 gcta64 \
-  --bfile toyf \
+  --bfile toy_null \
   --grm-sparse toyf_grm_sparse \
   --est-vg HE \
   --pheno toy_gcta_phenotype.txt \
   --qcovar toy_gcta_q_covariates.txt \
   --covar toy_gcta_c_covariates.txt \
   --fastGWA-mlm \
+  --model-only \
   --thread-num 4 \
-  --out fit_gcta_bmi_out
+  --out fit_gcta_bmi
+```
+
+Step 2: Perform final GWAS by also using the null model with GCTA
+
+```
+gcta64 \
+  --bfile toyf \
+  --load-model fit_gcta_bmi.fastGWA \
+  --out fit_gcta_bmi_out \
+  --thread-num 4
 ```
 
 The summary statistics are in `fit_gcta_bmi_out.fastGWA`.
+
+**NOTE**: If you need to run `gcta fastGWA` per chromosome (most probably), you
+can use the following template, assuming the `COHORT*` notation used in the
+preprocessing steps above:
+
+```
+for CHR in `seq 1 22`
+do
+  gcta64 \
+    --bfile COHORT_imputed_filtered_chr${CHR} \
+    --load-model fit_gcta_bmi.fastGWA \
+    --out fit_gcta_bmi_out_chr${CHR} \
+    --thread-num 4
+done
+```
+
+The summary statistics for each chromosome would then be in
+`fit_gcta_bmi_out_chr*.fastGWA`.
 
 ## Notes
 
