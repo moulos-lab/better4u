@@ -28,7 +28,7 @@ If you have any questions, please email all the following individuals:
 
 **TIMELINE FOR COMPLETION OF COHORT-SPECIFIC ANALYSES** 
 
-Please submit first results by **MM/DD/2024**
+Please submit first results by **30/10/2024**
 
 Before starting the analysis, please make sure that:
 
@@ -119,6 +119,9 @@ The tools will also be distributed as Docker/Singularity images.
 
 ## Apptainer/Singularity usage
 
+For software and analysis version integrity, we have put all the necessary
+software tools in a Singularity image which you must use.
+
 1. Navigate to the project directory or where you wish to execute the analysis.
 2. Download the latest version of the image created for the project:
 
@@ -165,13 +168,13 @@ Note that `REF` **must** correspond to the *reference* allele in the genome and
 `ALT` to the *alternative* allele, irrespectively of allele frequencies in the
 population. VCF file(s) must also be indexed. If not:
 
-```
+```bash
 tabix COHORT.vcf.gz
 ```
 
 or, if data are split per chromosome:
 
-```
+```bash
 for CHR in `seq 1 22`
 do
   tabix COHORT_chr${CHR}.vcf.gz
@@ -182,7 +185,7 @@ If the data are split per chromosome and you wish to perform the analysis
 genome-wide, a genome-wide VCF file should be created in order to proceed with 
 PLINK filtering:
 
-```
+```bash
 bcftools concat \
   --output-type z \
   --output COHORT.vcf.gz \
@@ -220,7 +223,7 @@ should be used to remame the samples:
 
 If you have genome-wide data:
 
-```
+```bash
 bcftools reheader \
   --samples new_sample_names.txt \
   --output COHORT_proper_names.vcf.gz \
@@ -229,7 +232,7 @@ bcftools reheader \
 
 If you have data per chromosome:
 
-```
+```bash
 for CHR in `seq 1 22`
 do
   bcftools reheader \
@@ -246,13 +249,13 @@ as `COHORT_proper_names` prefix.
 If you have proper IIDs and FIDs in the VCF which respect PLINK assumptions
 (underscore separation), the command to convert to PLINK format genome-wide is:
 
-```
+```bash
 plink --vcf COHORT.vcf.gz --make-bed --out COHORT
 ```
 
 or for each chromosome:
 
-```
+```bash
 for CHR in `seq 1 22`
 do
   plink --vcf COHORT_chr${CHR}.vcf.gz --make-bed --out COHORT_chr${CHR}
@@ -262,13 +265,13 @@ done
 If you don't have separate IIDs and FIDs, then the command for genome-wide data
 should be:
 
-```
+```bash
 plink --vcf COHORT.vcf.gz --make-bed --double-id --out COHORT
 ```
 
 or, per chromosome:
 
-```
+```bash
 for CHR in `seq 1 22`
 do
   plink --vcf COHORT_chr${CHR}.vcf.gz --make-bed --double-id \
@@ -282,7 +285,7 @@ By PLINK format we assume a triplet of BED+BIM+FAM files. If you have the data
 in other PLINK supported formats (unlikely) e.g. PED or LGEN, they must be
 transformed to BED+BIM+FAM. For example, if you have PED+MAP format:
 
-```
+```bash
 plink --file COHORT --make-bed --out COHORT
 ```
 
@@ -292,7 +295,7 @@ chromosome, these should be merged in one BED+BIM+FAM triplet (FAM should be the
 same for all). It is your responsibility to deal with potential issues that can 
 arise from the merging (e.g. duplicates) prior to merging.
 
-```
+```bash
 for CHR in `seq 1 22`
 do
   echo COHORT_chr${CHR} >> mergelist.txt
@@ -346,7 +349,7 @@ accepted [best practices](https://onlinelibrary.wiley.com/doi/10.1002/sim.6605).
 
 First, we calculate heterozygosities:
 
-```
+```bash
 plink \
   --bfile COHORT \
   --out COHORT --het
@@ -355,7 +358,7 @@ plink \
 Then, we create a file with sample names with heterozygosities within the limits
 of our filter (sample filter #2 above):
 
-```
+```r
 Rscript \
   -e '{
     hetData <- read.table("COHORT.het",header=TRUE,check.names=FALSE)
@@ -377,7 +380,7 @@ a final list of samples to be kept in later analysis.
 The following `plink` command will apply variant filters #1,2,3 and sample 
 filter #1:
 
-```
+```bash
 plink \
   --bfile COHORT \
   --out COHORT_tmp \
@@ -391,7 +394,7 @@ plink \
 We now create files with variants and samples to *keep* (samples to keep are 
 merged with those passing heterozygosity filters):
 
-```
+```r
 cut -d" " -f1-2 COHORT_tmp.fam > generic_samples_pass.txt
 cut -f2 COHORT_tmp.bim > generic_variants_pass.txt
 
@@ -411,7 +414,7 @@ Based on the variant and sample content of the files `generic_variants_pass.txt`
 and `all_samples_pass.txt` we create filtered PLINK files. These will be used
 for IBD analysis filtering (can be skipped if not necesseary) and PCA.
 
-```
+```bash
 plink \
   --bfile COHORT \
   --out COHORT_filtered \
@@ -425,7 +428,7 @@ perform LD-pruning to exclude variants in LD and then IBD calculations with
 `plink`. LD-pruning will produce the file `COHORT_filtered.prune.out` which will
 be used for IBD calculations:
 
-```
+```bash
 plink \
   --bfile COHORT_filtered \
   --out COHORT_filtered \
@@ -441,7 +444,7 @@ plink \
 The file `COHORT_filtered.genome.gz` is compressed as it may be large. We are
 using this in order to find any samples to exclude:
 
-```
+```r
 Rscript\
   -e '{
     fam <- read.table("COHORT_filtered.fam")
@@ -458,7 +461,7 @@ Rscript\
 
 Create PLINK files ready for PCA:
 
-```
+```bash
 plink \
   --bfile COHORT_filtered \
   --out COHORT_ibd \
@@ -468,7 +471,7 @@ plink \
 
 Alternatively, IBD analysis may be performed with KING (prior to LD pruning):
 
-```
+```bash
 king \
   -b COHORT_filtered.bed \
   --unrelated \
@@ -480,7 +483,7 @@ The aforementioned command will create the file `individuals_unrelated.txt`
 which we use with PLINK to create the dataset with related individuals removed
 (optional).
 
-```
+```bash
 plink \
   --bfile COHORT_filtered \
   --keep individuals_unrelated.txt \
@@ -488,7 +491,7 @@ plink \
   --make-bed
 ```
 
-Principal Component Analysis (optional)
+Principal Component Analysis *(optional)*
 
 *WIP*
 
@@ -496,7 +499,7 @@ Principal Component Analysis (optional)
 
 First, we calculate heterozygosities per chromosome:
 
-```
+```bash
 for CHR in `seq 1 22`
 do
 plink \
@@ -508,7 +511,7 @@ done
 Then, we create a file with sample names with heterozygosities within the limits
 of our filter (sample filter #2 above):
 
-```
+```r
 Rscript \
   -e '{
     # Read heterozygosity calculations per chromosome
@@ -545,7 +548,7 @@ a final list of samples to be kept in later analysis.
 
 The following `plink` command will apply variant filters #1,2,3:
 
-```
+```bash
 for CHR in `seq 1 22`
 do
 plink \
@@ -566,7 +569,7 @@ performed genome-wide**.
 
 Firstly we calculate missing reports for each chromosome:
 
-```
+```bash
 for CHR in `seq 1 22`
 do
 plink \
@@ -579,7 +582,7 @@ done
 Then, we will read the report for each chromosome and calculate average 
 missingness rates for each sample:
 
-```
+```r
 Rscript \
   -e '{
     ids <- read.table("COHORT_chr1.imiss.gz",header=TRUE)[,c(1,2)]
@@ -604,7 +607,7 @@ merged with those passing heterozygosity filters):
 
 For variants:
 
-```
+```bash
 for CHR in `seq 1 22`
 do
   cut -f2 COHORT_chr${CHR}_tmp.bim > generic_variants_pass_chr${CHR}.txt
@@ -613,7 +616,7 @@ done
 
 For samples:
 
-```
+```r
 Rscript \
   -e '{
     het <- read.table("het_samples_pass.txt")
@@ -631,7 +634,7 @@ Based on the variant and sample content of the files
 we create filtered PLINK files for each chromosome. These will be used
 for IBD analysis filtering (can be skipped if not necesseary) and PCA.
 
-```
+```bash
 for CHR in `seq 1 22`
 do
   plink \
@@ -648,7 +651,7 @@ perform LD-pruning per chromosome to exclude variants in LD and then IBD
 calculations with `plink`. LD-pruning will produce the files 
 `COHORT_filtered_chr${CHR}.prune.out` which will be used for IBD calculations:
 
-```
+```bash
 for CHR in `seq 1 22`
 do
 plink \
@@ -677,7 +680,7 @@ using a minimal toolset at the same time for data integrity and interoperability
 issues. The following method (median `PH_HAT` accross chromosomes) seems to be
 adequately compatible with the original.**
 
-```
+```r
 Rscript \
   -e '{
     fam <- read.table("COHORT_filtered_chr1.fam")
@@ -706,7 +709,7 @@ Rscript \
 
 Create PLINK files ready for PCA:
 
-```
+```bash
 for CHR in `seq 1 22`
 do
 plink \
@@ -717,14 +720,13 @@ plink \
 done
 ```
 
-Principal Component Analysis (optional)
+Principal Component Analysis *(optional)*
 
 *WIP*
 
-
 ## 0.3 Cleanup (optional)
 
-```
+```bash
 rm COHORT_ibd* *prune* COHORT_tmp* 
 ```
 
@@ -743,7 +745,7 @@ passing imputation quality control. This list will be used along with the lists
 from all partners to ensure that the variants used for PCA across all cohorts
 will be present across all partners:
 
-```
+```bash
 for CHR in `seq 1 22`
 do
   bcftools view \
@@ -764,7 +766,7 @@ In the following, we exclude imputed variants with imputation score
 (R<sup>2</sup) less than 0.3. This is done in parallel (per chromosome) where
 possible:
 
-```
+```bash
 for CHR in `seq 1 22`
 do
   bcftools filter \
@@ -780,7 +782,7 @@ wide or per chromosome) concatenate the VCF files in preparation for conversion
 to PLINK format for the rest of the filtering as well as PCA operations. We 
 assume that the concatenated VCF file is called `COHORT_imputed.vcf.gz`:
 
-```
+```bash
 bcftools concat \
   --output-type z \
   --output COHORT_imputed.vcf.gz \
@@ -789,13 +791,13 @@ bcftools concat \
 
 Finally, we convert to PLINK:
 
-```
+```bash
 plink --vcf COHORT_imputed.vcf.gz --make-bed --out COHORT_imputed
 ```
 
 or for each chromosome if we maintain files per chromosome:
 
-```
+```bash
 for CHR in `seq 1 22`
 do
   plink --vcf chr${CHR}_filtered.dose.vcf.gz --make-bed \
@@ -826,7 +828,7 @@ As in pre-imputation. we sequentially apply variant and sample filters.
 
 First, we calculate heterozygosities:
 
-```
+```bash
 plink \
   --bfile COHORT_imputed \
   --out COHORT_imputed --het
@@ -835,7 +837,7 @@ plink \
 Then, we create a file with sample names with heterozygosities within the limits
 of our filter (sample filter #2 above):
 
-```
+```r
 Rscript \
   -e '{
     hetData <- read.table("COHORT_imputed.het",header=TRUE,check.names=FALSE)
@@ -857,7 +859,7 @@ a final list of samples to be kept in later analysis.
 The following `plink` command will apply variant filters #1,2,3 and sample 
 filter #1:
 
-```
+```bash
 plink \
   --bfile COHORT_imputed \
   --out COHORT_imputed_tmp \
@@ -871,7 +873,7 @@ plink \
 We now create files with variants and samples to *keep* (samples to keep are 
 merged with those passing heterozygosity filters):
 
-```
+```r
 cut -d" " -f1-2 COHORT_imputed_tmp.fam > generic_samples_ipass.txt
 cut -f2 COHORT_imputed_tmp.bim > generic_variants_ipass.txt
 
@@ -889,7 +891,7 @@ Rscript \
 
 Create PLINK files ready for PCA:
 
-```
+```bash
 plink \
   --bfile COHORT_imputed \
   --out COHORT_imputed_filtered \
@@ -900,7 +902,7 @@ plink \
 
 Alternatively, IBD analysis may be performed with KING (prior to LD pruning):
 
-```
+```bash
 king \
   -b COHORT_imputed_tmp.bed \
   --unrelated \
@@ -912,7 +914,7 @@ The aforementioned command will create the file `individuals_unrelated.txt`
 which we use with PLINK to create the dataset with related individuals removed
 (optional).
 
-```
+```bash
 plink \
   --bfile COHORT_imputed \
   --keep individuals_unrelated.txt \
@@ -930,7 +932,7 @@ based on PCA projections on the 1000 genomes project data. See also the file
 
 First, we calculate heterozygosities per chromosome:
 
-```
+```bash
 for CHR in `seq 1 22`
 do
 plink \
@@ -942,7 +944,7 @@ done
 Then, we create a file with sample names with heterozygosities within the limits
 of our filter (sample filter #2 above):
 
-```
+```r
 Rscript \
   -e '{
     # Read heterozygosity calculations per chromosome
@@ -979,7 +981,7 @@ a final list of samples to be kept in later analysis.
 
 The following `plink` command will apply variant filters #1,2,3:
 
-```
+```bash
 for CHR in `seq 1 22`
 do
 plink \
@@ -1000,7 +1002,7 @@ performed genome-wide**.
 
 Firstly we calculate missing reports for each chromosome:
 
-```
+```bash
 for CHR in `seq 1 22`
 do
 plink \
@@ -1013,7 +1015,7 @@ done
 Then, we will read the report for each chromosome and calculate average 
 missingness rates for each sample:
 
-```
+```r
 Rscript \
   -e '{
     ids <- read.table("COHORT_imputed_chr1.imiss.gz",header=TRUE)[,c(1,2)]
@@ -1038,7 +1040,7 @@ merged with those passing heterozygosity filters):
 
 For variants:
 
-```
+```bash
 for CHR in `seq 1 22`
 do
   cut -f2 COHORT_imputed_chr${CHR}_tmp.bim > generic_variants_pass_chr${CHR}.txt
@@ -1047,7 +1049,7 @@ done
 
 For samples:
 
-```
+```r
 Rscript \
   -e '{
     het <- read.table("het_samples_pass.txt")
@@ -1065,7 +1067,7 @@ Based on the variant and sample content of the files
 we create filtered PLINK files for each chromosome. These will be used
 for IBD analysis filtering (can be skipped if not necesseary) and PCA.
 
-```
+```bash
 for CHR in `seq 1 22`
 do
   plink \
@@ -1083,7 +1085,7 @@ calculations with `plink`. LD-pruning will produce the files
 `COHORT_imputed_filtered_chr${CHR}.prune.out` which will be used for IBD
 calculations:
 
-```
+```bash
 for CHR in `seq 1 22`
 do
 plink \
@@ -1115,7 +1117,7 @@ populations, reading IBD `*.genome.gz` files may take a considerable amount of
 time. Consider replacing `read.table` with `fread` from the package 
 `data.table`.
 
-```
+```r
 Rscript \
   -e '{
     fam <- read.table("COHORT_imputed_filtered_chr1.fam")
@@ -1145,7 +1147,7 @@ Rscript \
 
 Create reduced (by removed samples) PLINK files ready for PCA:
 
-```
+```bash
 for CHR in `seq 1 22`
 do
 plink \
@@ -1158,7 +1160,7 @@ done
 
 And then merge them in preparation for PCA and/or PC projection to 1000 genomes:
 
-```
+```bash
 for CHR in `seq 1 22`
 do
   echo COHORT_imputed_ibd_chr${CHR} >> mergelist.txt
@@ -1213,7 +1215,7 @@ not be a problem. Otherwise, please contact the central analysis team
 
 Firstly, create the PLINK files for PCA projection:
 
-```
+```bash
 plink \
   --bfile COHORT_imputed_filtered_merged \
   --out COHORT_for_PCA \
@@ -1242,7 +1244,7 @@ We are now editing the file `projections.txt` so as to:
 1. Anonymize the individual ids accompanying the PC projections
 2. Create a map between the new and the old ids
 
-```
+```r
 Rscript \
   -e '{
     NUMBERS <- as.character(seq(0,9))
@@ -1293,7 +1295,7 @@ the same ids can be regenerated in case of loss.
 
 Plot the first 3 PCs from the `shared_projections.txt` file against each other:
 
-```
+```r
 Rscript \
   -e '{
     data <- read.table("shared_projections.txt",header=TRUE)
@@ -1363,7 +1365,7 @@ with PLINK.
 Firstly, perform pruning (will be done based on the reference panel for the
 canonical analysis):
 
-```
+```bash
 plink \
   --bfile toy \
   --out toy \
@@ -1372,7 +1374,7 @@ plink \
 
 Then, calculate 10 PCs exluding the pruned SNPs:
 
-```
+```bash
 plink \
   --bfile toy \
   --out toy \
@@ -1386,7 +1388,7 @@ use the PC projections file provided by the central analysis team or created by
 yourself using the set of SNPs provided by the central analysis team. We then
 construct the covariates and phenotype file:
 
-```
+```r
 Rscript \
   -e '{
     # Read all phenotypes
@@ -1435,7 +1437,7 @@ Step 0: exclude monomorphic and low variance SNPs from the toy dataset as they
 cause `regenie` to crash. Generally, QC **must** be performed prior to running
 `regenie`:
 
-```
+```bash
 plink \
   --bfile toy \
   --out toyf \
@@ -1445,7 +1447,7 @@ plink \
 
 Step 1:
 
-```
+```bash
 regenie \
   --step 1 \
   --bed toyf \
@@ -1457,7 +1459,7 @@ regenie \
 
 Step 2:
 
-```
+```bash
 regenie \
   --step 2 \
   --bed toyf \
@@ -1493,7 +1495,7 @@ in Step 2.
 
 ### Step 1: Find related individuals with KING
 
-```
+```bash
 king \
   -b toyf.bed \
   --unrelated \
@@ -1503,7 +1505,7 @@ king \
 
 ### Step 2: Conduct LD-pruning excluding related samples
 
-```
+```bash
 plink \
   --bfile toyf \
   --keep individuals_unrelated.txt \
@@ -1513,7 +1515,7 @@ plink \
 
 ### Step 3: Create PLINK files with the pruned variants and *all* samples
 
-```
+```bash
 plink \
   --bfile toyf \
   --extract toyf_pruned.prune.in \
@@ -1526,7 +1528,7 @@ plink \
 `--thread-num` can be set according to the system of each user. We set a small
 number for the toy dataset.
 
-```
+```bash
 gcta64 \
   --bfile toyf_for_grm \
   --make-grm \
@@ -1538,7 +1540,7 @@ gcta64 \
 This will produce the files `toyf_grm.grm.bin`, `toyf_grm.grm.id`, 
 `toyf_grm.grm.N.bin`.
 
-```
+```bash
 gcta64 \
   --grm toyf_grm \
   --make-bK-sparse 0.05 \
@@ -1560,7 +1562,7 @@ team. For this example only, we calculate 10 PCs with PLINK.
 Firstly, perform pruning (will be done based on the reference panel for the
 canonical analysis):
 
-```
+```bash
 plink \
   --bfile toy \
   --out toy \
@@ -1569,7 +1571,7 @@ plink \
 
 Then, calculate 10 PCs exluding the pruned SNPs:
 
-```
+```bash
 plink \
   --bfile toy \
   --out toy \
@@ -1583,7 +1585,7 @@ use the PC projections file provided by the central analysis team or created by
 yourself using the set of SNPs provided by the central analysis team. We then
 construct the covariates (categorical + quantitative) and phenotype file:
 
-```
+```r
 Rscript \
   -e '{
     # Read all phenotypes
@@ -1636,7 +1638,7 @@ Rscript \
 
 Step 1: Create the null model using pruned SNPs with GCTA
 
-```
+```bash
 plink \
   --bfile toy \
   --out toy_null \
@@ -1658,7 +1660,7 @@ gcta64 \
 
 Step 2: Perform final GWAS by also using the null model with GCTA
 
-```
+```bash
 gcta64 \
   --bfile toyf \
   --load-model fit_gcta_bmi.fastGWA \
@@ -1672,7 +1674,7 @@ The summary statistics are in `fit_gcta_bmi_out.fastGWA`.
 can use the following template, assuming the `COHORT*` notation used in the
 preprocessing steps above:
 
-```
+```bash
 for CHR in `seq 1 22`
 do
   gcta64 \
@@ -1691,7 +1693,7 @@ The summary statistics for each chromosome would then be in
 * If you work in a multicore Linux system with enough available RAM, use the
 ambersand (`&`) symbol at the end of command lines, for example:
 
-```
+```bash
 for CHR in `seq 1 22`
 do
 plink \
@@ -1707,7 +1709,7 @@ heterozygosity file per chromosome.
 data) that cannot finish in an interactive shell session in reasonable time. For
 example, put the commands to run in a file `commands.sh`, for example:
 
-```
+```bash
 #!/bin/bash
 
 for CHR in `seq 1 22`
@@ -1720,7 +1722,7 @@ done
 
 Then, execute:
 
-```
+```bash
 nohup sh commands.sh > commands.log &
 ```
 
