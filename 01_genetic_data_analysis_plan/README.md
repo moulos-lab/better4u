@@ -1,10 +1,26 @@
-First Analysis Plan for Genetic Data - WP3
+Analysis Plan for Genetic Data - BETTER4U WP3 - version 1
 ================================================================================
 
-### Authors
+## Authors
+
+**Panagiotis Moulos** <sup>1,2</sup><br/>
+<sup>1</sup>Harokopio University of Athens, <sup>2</sup>BSRC Alexander Fleming
+
+**René Pool** <sup>3</sup><br/>
+<sup>3</sup>Vrije Universiteit Amsterdam
+
+**Jon Anders Eriksson** <sup>4</sup><br/>
+<sup>4</sup>University of Tartu
+
+**Nana Kalafati** <sup>1,5</sup><br/>
+<sup>1</sup>Harokopio University of Athens, <sup>5</sup>University of Thessaly
+
+### Contact details
 
 * Panagiotis Moulos (moulos@fleming.gr)
 * René Pool (r.pool@vu.nl)
+* Jon Anders Eriksson (anders.eriksson@ut.ee)
+* Nana Kalafati (nkalafati@gmail.com)
 
 # Introduction
 
@@ -18,17 +34,17 @@ quality control (QC) and analysis and provide summary results for meta-analysis.
 Results files will be deposited to a central repository where additional QC and
 the meta-analysis will be performed.
 
-If you have any questions, please email all the following individuals: 
+During the construction of this plan, we tried to include as many steps as
+possible, even for the pre-imputation stages. Please go through the plan and
+identify the steps that are suitable for your case. Most partners will probably
+start from section 1 and skip section 0.
 
-* Panagiotis Moulos (moulos@fleming.gr)
-* René Pool (r.pool@vu.nl)
-* Jon Anders Eriksson (anders.eriksson@ut.ee)
-* Nana Kalafati (nkalafati@gmail.com)
-* ...Others
+If you have any questions, please email all individuals mentioned in the contact
+details above.
 
 **TIMELINE FOR COMPLETION OF COHORT-SPECIFIC ANALYSES** 
 
-Please submit first results by **30/10/2024**
+Please submit first results by **Friday 15/11/2024**
 
 Before starting the analysis, please make sure that:
 
@@ -55,9 +71,11 @@ males and females.
 (chrM/MT).
 4. In studies with more than one measurement points, we ask that you perform the
 cross-sectional analyses for each one of your cohort’s measurement points.
-5. Template scripts in R will be provided within the [GitHub repository](#) 
-linked to project overview XXX. Sharing your work here is highly appreciated. 
-These environments are private, so please share your github ID with XXX (XXX).
+5. Template scripts are provided with this analysis plan, also available in a
+[GitHub repository](https://github.com/moulos-lab/better4u/tree/main/01_genetic_data_analysis_plan). While we have made several tests to be as compatible as possible, 
+several modifications may be needed. Sharing your work therefore, is highly
+appreciated. These environments are private, so please make sure to request
+access if you require by emailing Panagiotis Moulos.
 6. Meta-analysis of the results will be led by the UTARTU team using the 
 [MR-MEGA](https://genomics.ut.ee/en/tools#:~:text=Instructions-,MR%2DMEGA,-Introduction) software and methodology. 
 
@@ -69,21 +87,36 @@ analysts to only include data measured using the following measurement units:
 1. For BMI, please use kg/m<sup>2</sup> and two decimals (e.g. `23.87`). For BMI
 in children and adolescents, please replace BMI with zBMI. You will find 
 attached the relevant syntax for calculating zBMI based on 
-[Cole and Lobstein et al., 2012](https://pubmed.ncbi.nlm.nih.gov/22715120/) in 
-the XXX script.
+[Cole and Lobstein et al., 2012](https://pubmed.ncbi.nlm.nih.gov/22715120/).
 2. For weight, please use as unit kg with two decimals. Only perform analyses in
 the sample of age greater than 18 years old.
 3. For height, please use as unit m in two decimals. Only perform analyses in 
 the sample of age greater than 18 years.
-4. For sex, please use the code: 1=man, 2=woman.
+4. For sex, please use the code: 1=man, 2=woman as per the BETTER4U codebook.
 
-We thank you for your cooperation.
+## Allele-ordering
+
+We assume that the starting points are HRC imputed SNPs provided in VCF files.
+As per the official VCF specification, the reference allele (`REF`) corresponds
+to that allele in the reference genome, while the alternative allele (`ALT`)
+corresponds to the alteration. Therefore the VCF specification may differ from
+the PLINK assumptions, where A1 is the minor allele and A2 is the major one, 
+irrespectively of the reference. As a result, the `REF` allele may not always
+correspond to the A2 PLINK allele in a population.
+
+The present analysis plan assumes that VCF/BCF files are converted to PLINK 
+files for all subsequent steps (further filtering, PCA, GWAS). Therefore, we we
+let PLINK re-arrange alleles if necessary during initial conversions, after 
+filtering for imputation score. If this strategy cannot be followed, make sure
+to use proper PLINK and/or bcftools commands to maintain the ordering for your
+case.
 
 # Requirements
 
 ## General assumptions
 
-1. Quality control steps for samples is going to be performed genome-wide.
+1. Quality control steps for samples is going to be performed genome-wide if
+possible or per chromosome with slight deviations.
 2. Quality control steps for variants is going to be performed chromosome-wise
 or genome-wide. Certain steps can be performed only genome-wide.
 3. Sample/individual names are named reasonably
@@ -96,9 +129,7 @@ or genome-wide. Certain steps can be performed only genome-wide.
 5. Data have not been subjected to Quality Control (QC).
 6. Main QC will be performed with PLINK, some steps may be performed with 
 `bcftools`.
-7. It is possible that there will be several back and forth format conversions 
-during all the process.
-8. Data organization (e.g. different directories per step etc.) is the 
+7. Data organization (e.g. different directories per step etc.) is the 
 responsibility of each partner. We may use a sample structure herein.
 
 ## Required software
@@ -333,7 +364,7 @@ The following variant filters are recommended:
 
 1. Variant call rate: >98%
 2. Minor Allele Frequency: >0.05
-3. Hardy-Weinberg equilibrium: >10<sup>-6</sup>
+3. Hardy-Weinberg equilibrium p-value: >10<sup>-6</sup>
 
 The following sample filters are recommended:
 
@@ -346,6 +377,9 @@ Below, we sequentially apply variant and sample filters according to widely
 accepted [best practices](https://onlinelibrary.wiley.com/doi/10.1002/sim.6605).
 
 ### 0.2.1 Genome-wide QC
+
+The following assume that your data are merged genome-wide and are not split per
+chromosome. For the latter case, see section 0.2.2.
 
 First, we calculate heterozygosities:
 
@@ -496,6 +530,9 @@ Principal Component Analysis *(optional)*
 *WIP*
 
 ### 0.2.2 QC per chromosome and sample
+
+The following assume that your data are split per chromosome. For the 
+genome-wide merged data case, see Section 0.2.1.
 
 First, we calculate heterozygosities per chromosome:
 
@@ -813,7 +850,7 @@ For variant filters:
 
 1. Variant call rate: >98%
 2. Minor Allele Frequency: >0.05 (this should also exclude monomorphic variants)
-3. Hardy-Weinberg equilibrium: >10<sup>-6</sup>
+3. Hardy-Weinberg equilibrium p-value: >10<sup>-6</sup>
 
 For sample filters:
 
@@ -1185,7 +1222,7 @@ following samples should also be excluded from any analyses:
 - Pregnant women and individuals with any other acute or chronic clinical 
 condition that significantly alters normal body weight will be excluded.
 
-**IMPORTANT**: Analyses will take place separately for children/adolescents <18 
+**IMPORTANT**: Analyses will take place separately for children/adolescents <=18 
 years old and adults older than 18 years old.
 
 ## 1.5 Principal Component projections
@@ -1226,7 +1263,7 @@ plink \
 Then, project:
 
 ```
-flashpca \
+flashpca_x86-64 \
   --bfile COHORT_for_PCA \
   --inmeansd means_1000g.txt \
   --inload loads_1000g.txt
@@ -1237,7 +1274,8 @@ flashpca \
 
 **NOTE**: As per latest WP3 discussions, the following procedure is optional for
 each partner as long as each partner ensures that proper PCA covariates will be
-taken into account in GWAS, i.e. possible outliers excluded.
+taken into account in GWAS, i.e. possible outliers excluded. If help is needed
+on this process, then follow the steps below.
 
 We are now editing the file `projections.txt` so as to:
 
@@ -1254,7 +1292,7 @@ Rscript \
         return(do.call(paste0,replicate(s,sample(SPACE,n,replace=TRUE),FALSE)))
     }
 
-    PREFIX <- "YOUR_PARTNER_ID_IN_GRANT e.g. HUA"
+    #PREFIX <- "YOUR_PARTNER_ID_IN_GRANT e.g. HUA"
     PREFIX <- "HUA"
 
     # Read in projections
@@ -1262,6 +1300,13 @@ Rscript \
 
     # Strip FIDs
     proj <- proj[,-1,drop=FALSE]
+    
+    # Keep only the first 5 PCs to return to the central analysis team
+    proj <- proj[,1:6,drop=FALSE]
+    
+    # Round eigenvectors to the 3rd digit
+    for (i in 2:ncol(proj))
+        proj[,i] <- round(proj[,i],3)
 
     # Create random names and the map
     # We create 10-letter random strings to allow enough variability and avoid
@@ -1281,15 +1326,18 @@ Rscript \
   }'
 ```
 
-The file `shared_projections.txt` will be returned to the central analysis team 
+The file `shared_projections.txt` can be returned to the central analysis team 
 for processing. Its totality or part of it (e.g. if samples will be exluded as 
 outliers) will be returned to you to be used along with other covariates in the
-subsequent GWAS.
+subsequent GWAS, provided you need help with this process.
 
 The file `cohort_pseudo_map.txt` must be safely stored by you to map the 
 included individuals returned by the central analysis team (if anyone excluded)
 for the subsequent site-specific GWAS. The `set.seed()` function ensures that
 the same ids can be regenerated in case of loss.
+
+**NOTE**: Anders Eriksson has kindly provided an alternative script which, for
+PCA projections, skips other QC steps. It can be found in Appendix I.
 
 #### Plotting projections
 
@@ -1330,23 +1378,24 @@ The file `PC_plots.png` should be returned to the central analysis team.
 with anthropometric data, please make sure you run the analysis separately for 
 cases and controls.
 * In case of a family study or cryptic relatedness, please include a kinship 
-matrix in your analysis using XXX.
+matrix in your analysis, as shown below either with PLINK or KING (the latter
+preferred).
 * Any other cohort-specific covariates should be included as covariates in the 
 models.
 
-The following analyses will take place:
+The following analyses will take place (*YR* = **Y**ear of **R**ecruitment):
 
 1.
 
-$$ BMI(t) = age(t) + age(t)^2 + sex + \sum_{i=1}^n PC_i + OtherCohortSpecificCovariates $$
+$$ BMI(t) = age(t) + age(t)^2 + sex + YR + \sum_{i=1}^n PC_i + OtherCohortSpecificCovariates $$
 
 2.
 
-$$ \Delta BMI(t) = \Delta age(t) + sex + \sum_{i=1}^n PC_i + OtherCohortSpecificCovariates $$
+$$ \Delta BMI(t) = \Delta age(t) + sex + YR + \sum_{i=1}^n PC_i + OtherCohortSpecificCovariates $$
 
 3.
 
-$$ BodyWeight(t) = age(t) + age(t)^2 + sex + \sum_{i=1}^n PC_i + OtherCohortSpecificCovariates $$
+$$ \Delta BodyWeight(t) = age(t) + age(t)^2 + sex + YR + \sum_{i=1}^n PC_i + OtherCohortSpecificCovariates $$
 
 4. Others *WIP*
 
@@ -1476,9 +1525,7 @@ The summary statistics are in `test_bmi_out_firth_bmi.regenie`.
 
 **NOTE**: 
 
-1. All the parameters will be present in the final analysis plan and decided by
-the central analysis team.
-2. We used `--ignore-pred` here because our sample for Step 1 is too small to 
+We used `--ignore-pred` here because our sample for Step 1 is too small to 
 produce whole genome predictions required by `regenie`. It should **not** be the
 case with real data.
 
@@ -1728,13 +1775,55 @@ nohup sh commands.sh > commands.log &
 
 and you can safely close the session and check e.g. the next day.
 
+## Appendix I
+
+Create the PLINK files for PCA projection:
+
+```bash
+# We assume paths_to_vcf_files.txt will contain the paths to vcf or bcf files 
+# for all chromosomes
+# One file per line, starting at chromosome 1, the file for chromosome 2 on the 
+# second line, etc., ending with chromosome 22
+FILES=(`cat paths_to_vcf_files.txt`)
+for CHR in {1..22}; 
+do
+  VCF=${FILES[$CHR]};
+  bcftools view -Ob -T pca.targets.chr${CHR}.txt ${VCF} | \
+    bcftools annotate -Ob --remove ID --set-id +'%CHROM:%POS:%REF:%ALT' \
+    -o cohort_pca.chr${CHR}.bcf
+  bcftools index cohort_pca.chr${CHR}.bcf
+done
+
+bcftools concat -Ob -o cohort_pca.all.bcf cohort_pca.chr{1..22}.bcf
+bcftools query -f '%ID\t%REF\t%ALT\n' > pca.pos.plink.txt
+
+# Set A2 allele ti
+plink --bcf cohort_pca.all.bcf  \
+  --make-bed \
+  --a2-allele 2 1 pca.pos.plink.txt \
+  --keep-allele-order \
+  --out COHORT_for_PCA
+```
+
+Then, project:
+
+```bash
+flashpca_x86-64 \
+  --bfile COHORT_for_PCA \
+  --inmeansd means_1000g.txt \
+  --inload loads_1000g.txt
+  --project \
+  --outproj projections.txt \
+  --verbose
+```
+
 ## Open issues
 
-* "Anonymization" of PCs should be checked/verified.
-* Do we need also `FID` for the clustering of projected PCs? If yes the process
-above must be amended.
-* Do we need other population information to be provided along with the PC
-projections?
-* Will [the inverse normal transformation of residuals](https://www.biostars.org/p/312945/) 
-will be used for any BMI related associations?
-* Other intermediate steps?
+* Will [the inverse normal transformation of residuals](https://www.biostars.org/p/312945/)
+be used for any BMI related associations? We could use inverse normal 
+transformation since we have various ethnicities and populations. How will this
+be translated to normal BMI levels though to be used in clinical practice?
+* Output file formats: merge in one file? output files and columns (names, 
+decimals etc) needed to be returned to the central analysts
+* GWAS for different ethnicities?
+
