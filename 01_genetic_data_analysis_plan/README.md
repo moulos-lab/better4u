@@ -770,10 +770,11 @@ rm COHORT_ibd* *prune* COHORT_tmp*
 # 1. Post-imputation
 
 The HRC r1.1. 2016 reference panel is well preprocessed, therefore the output
-VCF files do not contain variant duplicates and do not contain multi-allelics.
-Therefore, their conversion to PLINK after imputation score filtering is more
-strightforward. The following assume that the VCF files are named as they are
-delivered by the Michigan Imputation Server, i.e. `chr{1..22}.dose.vcf.gz`.
+VCF files do not contain variant duplicates and do not contain multi-allelics
+in the same record. Therefore, their conversion to PLINK after imputation score
+filtering is more straightforward. The following assume that the VCF files are
+named as they are delivered by the Michigan Imputation Server, i.e. 
+`chr{1..22}.dose.vcf.gz`.
 
 ## 1.1 Provision of HRC good quality variants for PCA
 
@@ -786,7 +787,7 @@ will be present across all partners:
 for CHR in `seq 1 22`
 do
   bcftools view \
-    --format '%CHROM:%POS' \
+    --format '%CHROM:%POS:%REF:%ALT' \
     --include 'INFO/R2>0.3' > \
       COHORT_HRC_chr${CHR}_variant.ids &
 done
@@ -800,7 +801,8 @@ analysis team.
 ## 1.2 Poorly imputed variant filtering and conversion to PLINK
 
 In the following, we exclude imputed variants with imputation score 
-(R<sup>2</sup) less than 0.3. This is done in parallel (per chromosome) where
+(R<sup>2</sup) less than 0.3 and we rename the variants with the format 
+'%CHROM:%POS:%REF:%ALT'. This is done in parallel (per chromosome) where
 possible:
 
 ```bash

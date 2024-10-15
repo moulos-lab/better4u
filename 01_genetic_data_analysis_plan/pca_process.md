@@ -28,8 +28,6 @@ SUFFIX=".phase3_shapeit2_mvncall_integrated_v5b.20130502.genotypes.vcf.gz" ;
 
 for CHR in `seq 1 22`; 
 do
-    #echo ${PREFIX}${CHR}${SUFFIX}
-    #echo ${PREFIX}${CHR}${SUFFIX}".tbi"
     wget ${PREFIX}${CHR}${SUFFIX} ${PREFIX}${CHR}${SUFFIX}".tbi";
 done
 ```
@@ -46,22 +44,22 @@ wget ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/technical/reference/human_g1k_v37.
 ## 3. Convert the 1000 Genomes files to BCF
 
 In the following we are creating a first set of BCF files from 1000 genomes data
-which is suitable for further dowstreams selection of variants for PCA for the
+which is suitable for further dowstream selection of variants for PCA for the
 BETTER4U cohorts:
 
 * Include only bi-allelic SNPs with MAF > 0.05 (1st pipe)
 * Ensure that multi-allelic calls are split and that indels are left-aligned 
 compared to reference genome (2nd pipe)
-* Set the VCF ID field to the value: `CHROM:POS` (3rd pipe, this is suitable for
-using later with HRC variants as only unique SNPs are contained)
+* Set the VCF ID field to the value: `CHROM:POS:REF:ALT` (3rd pipe, this is
+suitable for using later with HRC variants)
 * Remove duplicates (4th pipe)
 
 Notes:
 
-- `-I +'%CHROM:%POS'` means that unset IDs will be set to 
-`CHROM:POS*`
+- `-I +'%CHROM:%POS:%REF:%ALT'` means that unset IDs will be set to 
+`CHROM:POS:REF:ALT`
 - `-x ID -I +'%CHROM:%POS:%REF:%ALT'` first erases the current ID and then sets 
-it to `CHROM:POS*`
+it to `%CHROM:%POS:%REF:%ALT`
 
 ```
 for CHR in `seq 1 22`; 
@@ -73,7 +71,7 @@ do
     ALL.chr${CHR}.phase3_shapeit2_mvncall_integrated_v5b.20130502.genotypes.vcf.gz | \
   bcftools norm --multiallelics -any --check-ref w \
     --fasta-ref human_g1k_v37.fasta | \
-  bcftools annotate --remove ID --set-id +'%CHROM:%POS' | \
+  bcftools annotate --remove ID --set-id +'%CHROM:%POS:%REF:%ALT' | \
   bcftools norm --output-type b --rm-dup both \
     --output ALL.chr${CHR}.phase3_shapeit2_mvncall_integrated_v5b.20130502.genotypes.bcf;
 done
@@ -91,7 +89,7 @@ do
 done
 ```
 
-And get a list of the remaining variants in `CHROM:POS` format to later 
+And get a list of the remaining variants in `CHROM:POS:REF:ALT` format to later 
 intersect with the HRC panel variants:
 
 ```
@@ -99,7 +97,7 @@ for CHR in `seq 1 22`;
 do
   echo "Getting ids for $CHR"
   
-  bcftools query --format '%CHROM:%POS' \    
+  bcftools query --format '%CHROM:%POS:%REF:%ALT' \    
     ALL.chr${CHR}.phase3_shapeit2_mvncall_integrated_v5b.20130502.genotypes.bcf \
     > ALL.chr${CHR}.variant.ids;
 done
@@ -121,7 +119,7 @@ do
     ALL.chr${CHR}.phase3_shapeit2_mvncall_integrated_v5b.20130502.genotypes.vcf.gz | \
   bcftools norm --multiallelics -any --check-ref w \
     --fasta-ref human_g1k_v37.fasta | \
-  bcftools annotate --remove ID --set-id +'%CHROM:%POS' | \
+  bcftools annotate --remove ID --set-id +'%CHROM:%POS:%REF:%ALT' | \
   bcftools norm --output-type b --rm-dup both \
     --output ALL.chr${CHR}.phase3_shapeit2_mvncall_integrated_v5b.20130502.genotypes.bcf &
 done
@@ -142,7 +140,7 @@ for CHR in `seq 1 22`;
 do
   echo "Getting ids for $CHR"
 
-  bcftools query --format '%CHROM:%POS' \
+  bcftools query --format '%CHROM:%POS:%REF:%ALT' \
     ALL.chr${CHR}.phase3_shapeit2_mvncall_integrated_v5b.20130502.genotypes.bcf > \
       ALL.chr${CHR}.variant.ids &
 done
@@ -228,8 +226,8 @@ Based on the above assumptions, the following R script:
 
 * Traverses each partner directory and reads the subdirectory contents (partner
 datasets)
-* Filters each dataset according to the Minimac INFO or Beagle R2 score 
-(cutoff: 0.3)
+* Filters each dataset according to the IMPUTE INFO or Beagle R2 score 
+(cutoff for INFO: 0.9, cutoff for R2: 0.8)
 * Gathers all the good quality SNPs from all individual partner datasets
 * Find the common good SNPs from all partners for each chromosome and writes
 the results.
@@ -240,7 +238,6 @@ Rscript \
   -e '{
     library(parallel)
 
-    #QC_CUT <- 0.3
     QC_CUT_R2 <- 0.8
     QC_CUT_INFO <- 0.9
     partners <- c("HUA","REGIONH","MUW","UCY","UTARTU","HMGU","VUA","TAUH",
@@ -290,7 +287,8 @@ Rscript \
                     else
                         keepVars <- vars
                     
-                    return(paste(keepVars[,1],keepVars[,2],sep=":"))
+                    return(paste(keepVars[,1],keepVars[,2],keepVars[,3],
+                        keepVars[,4],sep=":"))
                 },mc.cores=22)
                 
                 names(chrSnps) <- unlist(lapply(chrSnps,function(y) {
@@ -361,10 +359,12 @@ find these SNPS (in the form of Chr, Pos, Ref, Alt) in the file `pcapos.txt.zip`
 on [Google Drive](https://drive.google.com/file/d/1DApJrIG5CDI8C5U8yQFgYwHoCE7O0Qz0/view?usp=drive_link).
 
 After downloading this file, we split per chromosome and select only SNP names
-in the form of `chr:pos`:
+in the form of `chr:pos:ref:alt`:
 
 ```
-awk 'NR!=1 {print $1"\t"$2}' pcapos.txt | awk '{print > "chr"$1"_HRC1KG_common.tmp"}'
+awk 'NR!=1 {print $1"\t"$2"\t"$3"\t"$4}' pcapos.txt | \
+  awk '{print > "chr"$1"_HRC1KG_common.tmp"}'
+
 for FILE in *_HRC1KG_common.tmp
 do
     NAME=`echo $FILE | sed s/\.tmp/\.ids/`
@@ -375,6 +375,7 @@ done
 If we follow A. Eriksson process, step 5 below is **omitted**.
 
 ## 5. Remove any 1000 genomes variants not present in HRC imputed cohorts
+summary_impact_filter <- c("MODERATE","HIGH")
 
 We use the list of common SNPs derived above to intersect with 1000 genomes
 SNPs:
