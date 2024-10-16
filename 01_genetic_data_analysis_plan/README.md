@@ -109,7 +109,14 @@ files for all subsequent steps (further filtering, PCA, GWAS). Therefore, we we
 let PLINK re-arrange alleles if necessary during initial conversions, after 
 filtering for imputation score. If this strategy cannot be followed, make sure
 to use proper PLINK and/or bcftools commands to maintain the ordering for your
-case.
+case. If this strategy is not followed, then in each PLINK processing step
+(filtering, pruning etc.) the flags `--keep-allele-order` and `--a2-allele` must
+be used. The latter could render the process dysfunctional as we expect analysts
+to make adjustments to the general plan according to the cohorts for which they
+are responsible, and always maintaining these flags may prove difficult. What we
+suggest instead, is to rename each SNP right after the imputation process based
+on the `CHR:POS:REF:ALT` template based on the contents of the VCF returned by
+HRC imputation.
 
 # Requirements
 
@@ -810,11 +817,18 @@ for CHR in `seq 1 22`
 do
   bcftools filter \
     --exclude 'INFO/R2<0.3' \
+    chr${CHR}.dose.vcf.gz | \
+  bcftools annotate \
+    --remove ID \
+    --set-id +'%CHROM:%POS:%REF:%ALT' \
     --output-type z \
-    --output chr${CHR}_filtered.dose.vcf.gz \
-    chr${CHR}.dose.vcf.gz &
+    --output chr${CHR}_filtered.dose.vcf.gz &
 done
 ```
+
+The line `--exclude 'INFO/R2<0.3'` may have to be changed to 
+`--exclude 'INFO/INFO<0.3'` according to the imputation software. If the data
+have been imputed e.g. with Michigan Imputation Server, it should be `INFO/R2`.
 
 Subsequently, we (optionally, depending on the preferred analysis mode, genome-
 wide or per chromosome) concatenate the VCF files in preparation for conversion 

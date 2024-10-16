@@ -368,7 +368,7 @@ awk 'NR!=1 {print $1"\t"$2"\t"$3"\t"$4}' pcapos.txt | \
 for FILE in *_HRC1KG_common.tmp
 do
     NAME=`echo $FILE | sed s/\.tmp/\.ids/`
-    awk '{print $1":"$2}' $FILE > $NAME &
+    awk '{print $1":"$2":"$3":"$4}' $FILE > $NAME &
 done
 ```
 
@@ -418,7 +418,7 @@ do
     --split-x b37 no-fail \
     --extract chr${CHR}_HRC1KG_common.ids \
     --make-bed \
-    --out ALL.chr${CHR}.phase3_shapeit2_mvncall_integrated_v5b.20130502.genotypes
+    --out ALL.chr${CHR}.phase3_shapeit2_mvncall_integrated_v5b.20130502.genotypes &
 done
 ```
 
