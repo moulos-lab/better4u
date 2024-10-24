@@ -1264,22 +1264,33 @@ above), it remains **your** responsibility to make sure that **all** the
 variants in the provided file `pca_variants.txt` are present in your cohort. If
 the cohort is not very small and has been imputed with HRC panel, this should
 not be a problem. Otherwise, please contact the central analysis team 
-**immediately**.
+**immediately**. It is also **your** responsibility to ensure that the major/
+minor alleles present in the PCA SNPs are in alignment with your dataset. We
+provide a basic command to ensure this below.
 
-Firstly, create the PLINK files for PCA projection:
+Firstly, extract the reference allele from `loads_1000g.txt`
+
+```bash
+tail -n +2 loads_1000g.txt | cut -f 1,2 > refpos_1000g.txt
+```
+
+Firstly, create the PLINK files for PCA projection, switching some alleles if
+necessary:
 
 ```bash
 plink \
   --bfile COHORT_imputed_filtered_merged \
+  --a1-allele refpos_1000g.txt 2 1 \
   --out COHORT_for_PCA \
   --extract pca_variants.txt \
   --make-bed
 ```
 
-Then, project:
+Then, project (use `flashpca_x86-64` instead of `flashpca` if not running fron
+the Singularity image):
 
 ```
-flashpca_x86-64 \
+flashpca \
   --bfile COHORT_for_PCA \
   --inmeansd means_1000g.txt \
   --inload loads_1000g.txt
@@ -1821,10 +1832,11 @@ plink --bcf cohort_pca.all.bcf  \
   --out COHORT_for_PCA
 ```
 
-Then, project:
+Then, project (use `flashpca_x86-64` instead of `flashpca` if you are not 
+running from the container):
 
 ```bash
-flashpca_x86-64 \
+flashpca \
   --bfile COHORT_for_PCA \
   --inmeansd means_1000g.txt \
   --inload loads_1000g.txt
