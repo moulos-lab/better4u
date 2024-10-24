@@ -1276,7 +1276,7 @@ Firstly, extract the reference allele from `loads_1000g.txt`
 tail -n +2 loads_1000g.txt | cut -f 1,2 > refpos_1000g.txt
 ```
 
-Firstly, create the PLINK files for PCA projection, switching some alleles if
+Then, create the PLINK files for PCA projection, switching some alleles if
 necessary:
 
 ```bash
