@@ -92,7 +92,9 @@ attached the relevant syntax for calculating zBMI based on
 the sample of age greater than 18 years old.
 3. For height, please use as unit m in two decimals. Only perform analyses in 
 the sample of age greater than 18 years.
-4. For sex, please use the code: 1=man, 2=woman as per the BETTER4U codebook.
+4. For sex, please use the code: 1=man, 2=woman as per the [BETTER4U codebook](https://docs.google.com/spreadsheets/d/1KpkAg-TtwhToYrVv6AzTZDqXzV4z7nSF/edit?usp=drive_link&ouid=118003957781714794186&rtpof=true&sd=true).
+
+In general, we aim for having the phenotypes and other variables in keeping with the [BETTER4U codebook](https://docs.google.com/spreadsheets/d/1KpkAg-TtwhToYrVv6AzTZDqXzV4z7nSF/edit?usp=drive_link&ouid=118003957781714794186&rtpof=true&sd=true). So, please consult this `.xlsx` file when in doubt. If this does not resolve your issue, please contact the task leaders.
 
 ## Allele-ordering
 
