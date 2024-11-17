@@ -1,7 +1,9 @@
 Container Instructions
 =============================================================================
+# Installation
+Follow the instructions in the Apptainer/Singularity docs. If you do not have root access, see this: https://apptainer.org/admin-docs/master/installation.html#unprivileged-non-setuid-installation
 
-# Download and Build Instructions
+# Download and Build Image
 
 ## Apptainer/Singularity
 Download and build an Apptainer/Singularity compatible image from the Docker image on Docker Hub.
