@@ -81,6 +81,7 @@ MR-MEGA --help
 R --slave --vanilla < /tools/mrmega/fixP.r
 flashpca --help
 king --help
+qctool -help
 ```
 
 ## Tool Versions
@@ -98,6 +99,7 @@ Here are the versions of the tools included in this Docker image:
 | MR-MEGA    | 0.2     |
 | FlashPCA   | 2.0     |
 | KING       | 2.3.2   |
+| QCTOOL     | 2.2.0   |
 | R          | 4.4.1   |
 
 ## R Packages
