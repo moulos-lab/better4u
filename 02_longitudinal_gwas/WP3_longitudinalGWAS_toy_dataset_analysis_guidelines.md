@@ -3,11 +3,11 @@ BETTER4U - WP3 - Analysis plan for longitudinal BMI/weight trajectories (toy dat
 
 ## Authors
 
-**Lampros Mpouranis** ^1^ \
-^1^Harokopio University of Athens
+**Lampros Mpouranis** <sup>1</sup> \
+<sup>1</sup>Harokopio University of Athens
 
-**Jon Anders Eriksson** ^2^ \
-^2^University of Tartu
+**Jon Anders Eriksson** <sup>2</sup> \
+<sup>2</sup>University of Tartu
 
 ### Contact details
 
