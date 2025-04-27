@@ -1,43 +1,19 @@
----
-title: "[BETTER4U - WP3] Analysis plan for longitudinal BMI/weight trajectories (toy
-  dataset) v1.0"
-author: "Lampros Bouranis, Harokopio University of Athens"
-output:
-  word_document:
-    number_sections: yes
-    fig_caption: yes
-  html_document:
-    df_print: paged
-  pdf_document: default
-bibliography: WP3_longitudinalGWAS_analysisplan.bib
-csl: "american-statistical-association.csl"
-documentclass: article
-fontsize: 12pt
-geometry: margin = 1in
----
+BETTER4U - WP3 - Analysis plan for longitudinal BMI/weight trajectories (toy dataset) v1.0
+================================================================================
 
-<style type="text/css">
+## Authors
 
-body, td {
-   font-size: 14px;
-}
-code.r{
-  font-size: 12px;
-}
-pre {
-  font-size: 20px
-}
-</style>
+**Lampros Mpouranis** ^1^ \
+^1^Harokopio University of Athens
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
+**Jon Anders Eriksson** ^2^ \
+^2^University of Tartu
 
-<style>body {text-align: justify}</style>
+### Contact details
 
-# Contact details {-}
-
-- Lampros Bouranis (lampros.bouranis@hua.gr)
+* Lampros Bouranis (lampros.bouranis@hua.gr)
+* Panagiotis Moulos (moulos@fleming.gr)
+* Jon Anders Eriksson (anders.eriksson@ut.ee)
 
 # Introduction
 
@@ -442,9 +418,9 @@ Rscript \
 #
 ###########################################################################
 lib <- c("tidyr",
-		 "dplyr",
-		 "lubridate",
-		 "data.table")
+         "dplyr",
+         "lubridate",
+         "data.table")
 lapply(lib, require, character.only = TRUE)
 
 ###########################################################################
@@ -511,34 +487,34 @@ bmi_qcovs_keep_adulthood <- c("FID", "IID", "M_Age", paste0("PC",1:10))
 bmi_ccovs_keep_adulthood <- c("FID", "IID", "Sex")
 
 write.table(sumstats_BMI_adulthood[bmi_keep_adulthood],
-			file      = paste0(main_path, "Toy_bmi_adults_gcta_phenotype.txt"),
-			row.names = FALSE,
-			quote     = FALSE)
+            file      = paste0(main_path, "Toy_bmi_adults_gcta_phenotype.txt"),
+            row.names = FALSE,
+            quote     = FALSE)
 
 write.table(sumstats_BMI_adulthood[, bmi_qcovs_keep_adulthood, drop = FALSE],
-			file      = paste0(main_path, "Toy_bmi_adults_gcta_q_covariates.txt"),
-			row.names = FALSE,
-			quote     = FALSE)
+            file      = paste0(main_path, "Toy_bmi_adults_gcta_q_covariates.txt"),
+            row.names = FALSE,
+            quote     = FALSE)
 
 write.table(sumstats_BMI_adulthood[,bmi_ccovs_keep_adulthood, drop = FALSE],
-			file      = paste0(main_path, "Toy_bmi_adults_gcta_c_covariates.txt"),
-			row.names = FALSE,
-			quote     = FALSE)
+            file      = paste0(main_path, "Toy_bmi_adults_gcta_c_covariates.txt"),
+            row.names = FALSE,
+            quote     = FALSE)
 
 write.table(sumstats_BMI_elderly[bmi_keep_adulthood],
-			file      = paste0(main_path, "Toy_bmi_elderly_gcta_phenotype.txt"),
-			row.names = FALSE,
-			quote     = FALSE)
+            file      = paste0(main_path, "Toy_bmi_elderly_gcta_phenotype.txt"),
+            row.names = FALSE,
+            quote     = FALSE)
 
 write.table(sumstats_BMI_elderly[, bmi_qcovs_keep_adulthood, drop = FALSE],
-			file      = paste0(main_path, "Toy_bmi_elderly_gcta_q_covariates.txt"),
-			row.names = FALSE,
-			quote     = FALSE)
+            file      = paste0(main_path, "Toy_bmi_elderly_gcta_q_covariates.txt"),
+            row.names = FALSE,
+            quote     = FALSE)
 
 write.table(sumstats_BMI_elderly[,bmi_ccovs_keep_adulthood, drop = FALSE],
-			file      = paste0(main_path, "Toy_bmi_elderly_gcta_c_covariates.txt"),
-			row.names = FALSE,
-			quote     = FALSE)
+            file      = paste0(main_path, "Toy_bmi_elderly_gcta_c_covariates.txt"),
+            row.names = FALSE,
+            quote     = FALSE)
 
 #---- Export datasets for weight:
 weight_keep_adulthood       <- c("FID", "IID", "Weight_Beta")
@@ -546,63 +522,63 @@ weight_qcovs_keep_adulthood <- c("FID", "IID", "M_Age", paste0("PC",1:10))
 weight_ccovs_keep_adulthood <- c("FID", "IID", "Sex")
 
 write.table(sumstats_weight_adulthood[weight_keep_adulthood],
-			file      = paste0(main_path, "Toy_weight_adults_gcta_phenotype.txt"),
-			row.names = FALSE,
-			quote     = FALSE)
+            file      = paste0(main_path, "Toy_weight_adults_gcta_phenotype.txt"),
+            row.names = FALSE,
+            quote     = FALSE)
 
 write.table(sumstats_weight_adulthood[, weight_qcovs_keep_adulthood, drop = FALSE],
-			file      = paste0(main_path, "Toy_weight_adults_gcta_q_covariates.txt"),
-			row.names = FALSE,
-			quote     = FALSE)
+            file      = paste0(main_path, "Toy_weight_adults_gcta_q_covariates.txt"),
+            row.names = FALSE,
+            quote     = FALSE)
 
 write.table(sumstats_weight_adulthood[,weight_ccovs_keep_adulthood, drop = FALSE],
-			file      = paste0(main_path, "Toy_weight_adults_gcta_c_covariates.txt"),
-			row.names = FALSE,
-			quote     = FALSE)
+            file      = paste0(main_path, "Toy_weight_adults_gcta_c_covariates.txt"),
+            row.names = FALSE,
+            quote     = FALSE)
 
 write.table(sumstats_weight_elderly[weight_keep_adulthood],
-			file      = paste0(main_path, "Toy_weight_elderly_gcta_phenotype.txt"),
-			row.names = FALSE,
-			quote     = FALSE)
+            file      = paste0(main_path, "Toy_weight_elderly_gcta_phenotype.txt"),
+            row.names = FALSE,
+            quote     = FALSE)
 
 write.table(sumstats_weight_elderly[, weight_qcovs_keep_adulthood, drop = FALSE],
-			file      = paste0(main_path, "Toy_weight_elderly_gcta_q_covariates.txt"),
-			row.names = FALSE,
-			quote     = FALSE)
+            file      = paste0(main_path, "Toy_weight_elderly_gcta_q_covariates.txt"),
+            row.names = FALSE,
+            quote     = FALSE)
 
 write.table(sumstats_weight_elderly[,weight_ccovs_keep_adulthood, drop = FALSE],
-			file      = paste0(main_path, "Toy_weight_elderly_gcta_c_covariates.txt"),
-			row.names = FALSE,
-			quote     = FALSE)
-	
+            file      = paste0(main_path, "Toy_weight_elderly_gcta_c_covariates.txt"),
+            row.names = FALSE,
+            quote     = FALSE)
+    
 #---- Export the unique sample IDs per age group:
 write.table(sumstats_BMI_adulthood[c("FID", "IID")],
-			paste0(main_path, "Toy_bmi_adults_IDs.txt"),
-			sep      = "\t",
-			quote    = F,
-			row.names= F,
-			col.names= F)
+            paste0(main_path, "Toy_bmi_adults_IDs.txt"),
+            sep      = "\t",
+            quote    = F,
+            row.names= F,
+            col.names= F)
 
 write.table(sumstats_BMI_elderly[c("FID", "IID")],
-			paste0(main_path, "Toy_bmi_elderly_IDs.txt"),
-			sep      = "\t",
-			quote    = F,
-			row.names= F,
-			col.names= F)
+            paste0(main_path, "Toy_bmi_elderly_IDs.txt"),
+            sep      = "\t",
+            quote    = F,
+            row.names= F,
+            col.names= F)
 
 write.table(sumstats_weight_adulthood[c("FID", "IID")],
-			paste0(main_path, "Toy_weight_adults_IDs.txt"),
-			sep      = "\t",
-			quote    = F,
-			row.names= F,
-			col.names= F)
+            paste0(main_path, "Toy_weight_adults_IDs.txt"),
+            sep      = "\t",
+            quote    = F,
+            row.names= F,
+            col.names= F)
 
 write.table(sumstats_weight_elderly[c("FID", "IID")],
-			paste0(main_path, "Toy_weight_elderly_IDs.txt"),
-			sep      = "\t",
-			quote    = F,
-			row.names= F,
-			col.names= F)
+            paste0(main_path, "Toy_weight_elderly_IDs.txt"),
+            sep      = "\t",
+            quote    = F,
+            row.names= F,
+            col.names= F)
 }'
 ```
 
@@ -992,6 +968,4 @@ zip -r Toy_weight_elderly_fit_gcta_out.zip Toy_weight_elderly_fit_gcta_out.fastG
 * Regular time intervals: please upload the zipped log files with the results of fitting the null model (`.fastGWA`) (containing estimates of heritability etc.).
 
 * Irregular time intervals: The scripts will generate output files gwas.bmi.chr*.txt, gwas.bmi.chr*.err.txt, gwas.weight.chr*.txt and gwas.bmi.chr*.err.txt, where * are the numbers 1...22. Please zip together all these files and upload to the WP3 google drive in the **BETTER4U > WPS > WP > Weight_BMI_change > Results** folder. Please label the .zip file using the short name of your institution in the consortium listing. If using the R script for unrelated individuals, please report also the estimated ratio of the sampling noise to individual environmental noise (printed by the script).
-
-
 
