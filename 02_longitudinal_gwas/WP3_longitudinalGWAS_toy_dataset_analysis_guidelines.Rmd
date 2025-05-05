@@ -975,7 +975,7 @@ gcta64 \
 
 The summary statistics are in `.fastGWA`.
 
-**Step 5: Compress summary statistics file and upload**
+**Step 5: Compress summary statistics files and upload**
 
 ```
 zip -r Toy_bmi_adults_fit_gcta_out.zip Toy_bmi_adults_fit_gcta_out.fastGWA
@@ -987,11 +987,277 @@ zip -r Toy_weight_elderly_fit_gcta_out.zip Toy_weight_elderly_fit_gcta_out.fastG
 
 ### Irregular time intervals - R
 
+**Step 1: Compute the SNP effect size estimates**
+
+```r
+Rscript \
+-e '{
+###########################################################################
+#
+# Libraries
+#
+###########################################################################
+lib <- c("plyr",
+         "tidyr",
+         "dplyr",
+         "lubridate",
+         "data.table",
+         "stringr",
+         "genio",
+         "pbapply",
+         "parallel"
+         )
+lapply(lib, require, character.only = TRUE)
+
+###########################################################################
+#
+# Paths
+#
+###########################################################################
+
+main_path <- "//your_path//"
+
+###########################################################################
+#
+# Source files
+#
+###########################################################################
+
+source(paste0(main_path, 
+              "Source/",
+              "modeling_functions", 
+              ".R"))
+
+###########################################################################
+#
+# Data importation
+#
+###########################################################################
+proj                      <- read.delim(paste0(main_path, "Output//", "B4U_HUA_toy_projections.txt"))
+
+#---- Read PLINK files:
+plink_data                <- genio::read_plink(paste0(main_path, "Data/", "B4U_HUA_toy_genetics"))
+
+sumstats_BMI_adulthood    <- data.table::fread(paste0(main_path, "Output//", "Toy_bmi_summary_adults.txt"),     header = TRUE)
+sumstats_BMI_elderly      <- data.table::fread(paste0(main_path, "Output//", "Toy_bmi_summary_elderly.txt"),    header = TRUE)
+sumstats_weight_adulthood <- data.table::fread(paste0(main_path, "Output//", "Toy_weight_summary_adults.txt"),  header = TRUE)
+sumstats_weight_elderly   <- data.table::fread(paste0(main_path, "Output//", "Toy_weight_summary_elderly.txt"), header = TRUE)
+
+###########################################################################
+#
+# Data processing
+#
+###########################################################################
+proj$FID_IID   <- paste(proj$FID, proj$IID, sep = "_")
+proj_cols_keep <- c("FID_IID",
+                    "FID",
+                    "IID",
+                    paste0("PC",1:10))
+proj           <- proj[proj_cols_keep]
+
+# Round eigenvectors to the 3rd digit
+for ( i in 4:ncol(proj )) proj[,i] <- round(proj[,i],3)
+
+class(sumstats_BMI_adulthood) <- 
+  class(sumstats_BMI_elderly) <- 
+  class(sumstats_weight_adulthood) <- 
+  class(sumstats_weight_elderly) <- class(sumstats_weight_elderly)[2] 
+
+sumstats_BMI_adulthood <- 
+  sumstats_BMI_adulthood %>% 
+  left_join(proj, c("FID_IID" = "FID_IID"))
+
+sumstats_BMI_elderly <- 
+  sumstats_BMI_elderly %>% 
+  left_join(proj, c("FID_IID" = "FID_IID"))
+
+sumstats_weight_adulthood <- 
+  sumstats_weight_adulthood %>% 
+  left_join(proj, c("FID_IID" = "FID_IID"))
+
+sumstats_weight_elderly <- 
+  sumstats_weight_elderly %>% 
+  left_join(proj, c("FID_IID" = "FID_IID"))
+
+###########################################################################
+#
+# Data management - genotype file
+#
+###########################################################################
+
+BMI_keep_cols    <- c("IID",
+                      "BMI_Beta", 
+                      "M_Age",
+                      "S_Age",
+                      "N",
+                      "Sex", 
+                      paste0("PC", 1:10))
+weight_keep_cols <- c("IID", 
+                      "Weight_Beta", 
+                      "M_Age",
+                      "S_Age",
+                      "N",
+                      "Sex", 
+                      "Height_med",
+                      paste0("PC", 1:10))
+
+sumstats_BMI_adulthood    <- sumstats_BMI_adulthood[BMI_keep_cols]
+sumstats_BMI_elderly      <- sumstats_BMI_elderly[BMI_keep_cols]
+
+sumstats_weight_adulthood <- sumstats_weight_adulthood[weight_keep_cols]
+sumstats_weight_elderly   <- sumstats_weight_elderly[weight_keep_cols]
+
+# dim(plink_data$X)
+# [1] 441806     90
+
+#---- Convert to a data frame [takes a few mins]
+genotype_matrix <- as.data.frame(as.matrix(plink_data$X))
+genotype_matrix <- t(genotype_matrix)
+
+# Visual inspection:
+# genotype_matrix[1:3, 1:4]
+# genotype_matrix[8043:8045, 441804:441806]
+
+# Individual annotations:
+fam_annotations <- plink_data$fam
+
+#head(fam_annotations)
+
+# [takes a few mins]
+fam_annotations <- cbind(fam_annotations,
+                         genotype_matrix)
+
+# Check: fam_annotations[1:4, 1:4]
+fam_annotations$pat   <- NULL
+fam_annotations$id    <- NULL
+fam_annotations$mat   <- NULL
+fam_annotations$sex   <- NULL
+fam_annotations$pheno <- NULL
+
+rownames(fam_annotations) <- NULL
+
+# Check:
+# fam_annotations[1:4, 1:4]
+# dim(fam_annotations) 
+
+#---- Merge the PCA and genotypic data [takes less than a minute]:
+sumstats_BMI_adulthood <-
+  sumstats_BMI_adulthood %>%
+  left_join(fam_annotations, c("IID" = "fam"))
+
+sumstats_BMI_elderly <-
+  sumstats_BMI_elderly %>%
+  left_join(fam_annotations, c("IID" = "fam"))
+
+sumstats_weight_adulthood <-
+  sumstats_weight_adulthood %>%
+  left_join(fam_annotations, c("IID" = "fam"))
+
+sumstats_weight_elderly <-
+  sumstats_weight_elderly %>%
+  left_join(fam_annotations, c("IID" = "fam"))
+
+###########################################################################
+#
+# Modeling - estimation of SNP effect sizes
+#
+###########################################################################
+
+# ---- NOTE:
+# The following assumes that the analyst is working on a Linux computational environment.
+# Please specify the number of cores you wish to use.
+
+modeling_BMI_adulthood    <- modeling_fun(input_data = sumstats_BMI_adulthood,
+                                          pheno      = "BMI",
+                                          numcores   = detectCores() - 4)
+
+modeling_BMI_elderly      <- modeling_fun(input_data = sumstats_BMI_elderly,
+                                          pheno      = "BMI",
+                                          numcores   = detectCores() - 4)
+
+modeling_weight_adulthood <- modeling_fun(input_data = sumstats_weight_adulthood,
+                                          pheno      = "Weight",
+                                          numcores   = detectCores() - 4)
+
+modeling_weight_elderly   <- modeling_fun(input_data = sumstats_weight_elderly,
+                                          pheno      = "Weight",
+                                          numcores   = detectCores() - 4)
+
+###########################################################################
+#
+# Modeling - export
+#
+###########################################################################
+
+#---- BMI:
+write.table(modeling_BMI_adulthood$Effect_sizes,
+            paste0(main_path, "Toy_bmi_modeling_adults.txt"),
+            sep      = "\t",
+            quote    = F,
+            row.names= F)
+
+write.table(modeling_BMI_adulthood$Variance_ratio,
+            paste0(main_path, "Toy_bmi_varratio_adults.txt"),
+            sep      = "\t",
+            quote    = F,
+            row.names= F)
+
+write.table(modeling_BMI_elderly$Effect_sizes,
+            paste0(main_path, "Toy_bmi_modeling_elderly.txt"),
+            sep      = "\t",
+            quote    = F,
+            row.names= F)
+
+write.table(modeling_BMI_elderly$Variance_ratio,
+            paste0(main_path, "Toy_bmi_varratio_elderly.txt"),
+            sep      = "\t",
+            quote    = F,
+            row.names= F)
+
+#---- Weight:
+write.table(modeling_weight_adulthood$Effect_sizes,
+            paste0(main_path, "Toy_weight_modeling_adults.txt"),
+            sep      = "\t",
+            quote    = F,
+            row.names= F)
+
+write.table(modeling_weight_adulthood$Variance_ratio,
+            paste0(main_path, "Toy_weight_varratio_adults.txt"),
+            sep      = "\t",
+            quote    = F,
+            row.names= F)
+
+write.table(modeling_weight_elderly$Effect_sizes,
+            paste0(main_path, "Toy_weight_modeling_elderly.txt"),
+            sep      = "\t",
+            quote    = F,
+            row.names= F)
+
+write.table(modeling_weight_elderly$Variance_ratio,
+            paste0(main_path, "Toy_weight_varratio_elderly.txt"),
+            sep      = "\t",
+            quote    = F,
+            row.names= F)
+
+}'
+```
+
+The summary statistics are in `..._modeling_...txt`.
+
+The estimated ratio of the sampling noise to individual environmental noise is in `..._varratio_...txt`.
+
+**Step 2: Compress effect size estimates statistics files and upload**
+  
+```
+zip -r Toy_bmi_modeling_adults.zip Toy_bmi_modeling_adults.txt
+zip -r Toy_bmi_modeling_elderly.zip Toy_bmi_modeling_elderly.txt
+
+zip -r Toy_weight_modeling_adults.zip Toy_weight_modeling_adults.txt
+zip -r Toy_weight_modeling_elderly.zip Toy_weight_modeling_elderly.txt
+```
+
 ## Upload results
 
 * Regular time intervals: please upload the zipped log files with the results of fitting the null model (`.fastGWA`) (containing estimates of heritability etc.).
 
 * Irregular time intervals: The scripts will generate output files gwas.bmi.chr*.txt, gwas.bmi.chr*.err.txt, gwas.weight.chr*.txt and gwas.bmi.chr*.err.txt, where * are the numbers 1...22. Please zip together all these files and upload to the WP3 google drive in the **BETTER4U > WPS > WP > Weight_BMI_change > Results** folder. Please label the .zip file using the short name of your institution in the consortium listing. If using the R script for unrelated individuals, please report also the estimated ratio of the sampling noise to individual environmental noise (printed by the script).
-
-
-
