@@ -1142,7 +1142,7 @@ sumstats_weight_elderly <-
 
 # ---- NOTE:
 # The following assumes that the analyst is working on a Linux computational environment.
-# Please specify the number of cores you wish to use.
+# Please specify the number of cores you wish to use with the option 'numcores', i.e. numcores = 10.
 
 modeling_BMI_adulthood    <- modeling_fun(input_data = sumstats_BMI_adulthood,
                                           pheno      = "BMI",
