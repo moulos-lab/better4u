@@ -974,35 +974,9 @@ awk '{print $2}' ./Data/B4U_HUA_toy_genetics.bim > ./Data/B4U_HUA_toy_genetics_S
 
 Please note that loading the genotype file to memory is likely to run into memory issues. Assuming 4 bytes per genotype and 500K loci, the estimated size in gigabytes (Gb) increases linearly with sample size:
 
-```{r eval = TRUE, echo = FALSE, warning = FALSE}
-library(ggplot2)
-
-# Source: https://cran.rstudio.com/web/packages/genio/vignettes/genio.html
-
-# Constants
-bytes_per_genotype <- 4
-bytes_per_gb       <- 1024 ^ 3
-
-# Example data dimensions
-num_ind  <- seq(1000, 200000, by = 5000)
-num_loci <- 500000
-
-# Gigabytes per 1000 individuals for a typical genotyping array
-gb_estimates <- round(bytes_per_genotype * num_ind * num_loci / bytes_per_gb, 2)
-
-comparison <- data.frame(Samples = num_ind,
-                         Gb      = gb_estimates)
-
-
-ggplot(comparison,
-       aes(x = Samples, 
-           y = Gb)) + 
-  geom_line() + 
-  geom_point() +
-  labs(x = "Sample size",
-       y = "Memory consumption (Gb)") +
-  theme_classic()
-```
+<div style="text-align: center;">
+  <img src="memory_consumption.png" alt="Description of the image" width="600" height="600">
+</div>
 
 To address this issue, as well as the scalability of the regression models that are implemented throughout the process, we have taken advantage of the functionalities of the R libraries [bigsnpr](https://pmc.ncbi.nlm.nih.gov/articles/PMC6084588/), [bigstatsr](https://cran.r-project.org/web/packages/bigstatsr/index.html), [bigmemory](https://cran.r-project.org/web/packages/bigmemory/index.html). To install such libraries in your machine, please use the instructions at the beginning of section *Phenotype file data management*.
 
