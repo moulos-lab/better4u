@@ -6,7 +6,6 @@ modeling_fun <- function(pheno_data,
                          )
 {
   
-  # Source:https://privefl.github.io/bigstatsr/articles/bigstatsr-and-bigmemory.html
   BM2FBM <- function(bm) {
     FBM(nrow        = nrow(bm), 
         ncol        = ncol(bm), 
@@ -17,10 +16,6 @@ modeling_fun <- function(pheno_data,
   
   output        <- vector("list", 2)
   names(output) <- c("Effect_sizes", "Variance_ratio")
-  
-  # For a linux environment:
-  # https://stackoverflow.com/questions/62644063/how-to-run-an-lapply-in-parallel-in-r
-  #cl            <- makeCluster(numcores, type = "FORK")
   
   if (pheno == "BMI"){
     
@@ -63,7 +58,6 @@ modeling_fun <- function(pheno_data,
     y          <- pheno_data$BMI_Beta
     covariates <- as.matrix(pheno_data[, keep_cols_cols])
     
-    ###########################
     # Run per-SNP regression adjusting for age and gender
     assoc_results <- bigstatsr::big_univLinReg(X      = geno_data, 
                                                y, 
@@ -75,16 +69,6 @@ modeling_fun <- function(pheno_data,
     assoc_results$score     <- NULL
     colnames(assoc_results) <- c("Beta","SE","P")
     
-    #attr(assoc_results, "predict")
-    
-    # dfs                     <- nrow(pheno_data) - length(keep_cols_cols) - 1 # n - k predictors - 1
-    # assoc_results$Pvalue2   <- pchisq((assoc_results[,1]/assoc_results[,2])^2, df=1, lower=F) # Source: https://www.mv.helsinki.fi/home/mjxpirin/GWAS_course/material/GWAS9.html
-    # assoc_results$Pvalue3 <- 2*stats::pt(assoc_results[,1]/assoc_results[,2], 
-    #                                    df         = dfs, 
-    #                                    lower.tail = FALSE, 
-    #                                    log.p      = FALSE) # Source: https://advstats.psychstat.org/book/mregression/index.php
-    # 
-    # head(assoc_results)
 
    #---- Transform the linear regression coefs and SEs and then calculate the p-value using the X^2 distribution:
     y_w          <- pheno_data$BMI_Beta * sqrt(pheno_data$Sample_Weight)
@@ -92,15 +76,8 @@ modeling_fun <- function(pheno_data,
     covariates_w <- as.matrix(covariates_w)
     
     geno_data_w <- geno_data$bm()
-    #class(geno_data_w)
-    #head(geno_data_w[1:3,1:3])
-    
-    # Source: https://privefl.github.io/bigstatsr/articles/bigstatsr-and-bigmemory.html
-    #geno_data_w <- BM2FBM( sweep(geno_data_w[,1:ncol(geno_data_w)], 1, sqrt(pheno_data$Sample_Weight), "*") )
-    #class(geno_data_w)
     geno_data_w <- BM2FBM(geno_data_w)
-    #class(geno_data_w)
-  
+
     out <- bigstatsr::big_univLinReg(X      = geno_data_w, 
                                      y_w, 
                                      covar  = covariates_w#,
@@ -171,32 +148,14 @@ modeling_fun <- function(pheno_data,
     assoc_results$score     <- NULL
     colnames(assoc_results) <- c("Beta","SE","P")
     
-    #attr(assoc_results, "predict")
-    
-    # dfs                     <- nrow(pheno_data) - length(keep_cols_cols) - 1 # n - k predictors - 1
-    # assoc_results$Pvalue2   <- pchisq((assoc_results[,1]/assoc_results[,2])^2, df=1, lower=F) # Source: https://www.mv.helsinki.fi/home/mjxpirin/GWAS_course/material/GWAS9.html
-    # assoc_results$Pvalue3 <- 2*stats::pt(assoc_results[,1]/assoc_results[,2], 
-    #                                    df         = dfs, 
-    #                                    lower.tail = FALSE, 
-    #                                    log.p      = FALSE) # Source: https://advstats.psychstat.org/book/mregression/index.php
-    # 
-    # head(assoc_results)
-    
     #---- Transform the linear regression coefs and SEs and then calculate the p-value using the X^2 distribution:
     y_w          <- pheno_data$Weight_Beta * sqrt(pheno_data$Sample_Weight)
     covariates_w <- sweep(pheno_data[, keep_cols_cols], 1, sqrt(pheno_data$Sample_Weight), "*")
     covariates_w <- as.matrix(covariates_w)
     
     geno_data_w <- geno_data$bm()
-    #class(geno_data_w)
-    #head(geno_data_w[1:3,1:3])
-    
-    # Source: https://privefl.github.io/bigstatsr/articles/bigstatsr-and-bigmemory.html
-    #geno_data_w <- BM2FBM( sweep(geno_data_w[,1:ncol(geno_data_w)], 1, sqrt(pheno_data$Sample_Weight), "*") )
-    #class(geno_data_w)
     geno_data_w <- BM2FBM(geno_data_w)
-    #class(geno_data_w)
-    
+
     out <- bigstatsr::big_univLinReg(X      = geno_data_w, 
                                      y_w, 
                                      covar  = covariates_w#,
