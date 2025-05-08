@@ -974,7 +974,7 @@ awk '{print $2}' ./Data/B4U_HUA_toy_genetics.bim > ./Data/B4U_HUA_toy_genetics_S
 
 Please note that loading the genotype file to memory is likely to run into memory issues. Assuming 4 bytes per genotype and 500K loci, the estimated size in gigabytes (Gb) increases linearly with sample size:
 
-```{r echo = FALSE, warning = FALSE}
+```{r eval = TRUE, echo = FALSE, warning = FALSE}
 library(ggplot2)
 
 # Source: https://cran.rstudio.com/web/packages/genio/vignettes/genio.html
