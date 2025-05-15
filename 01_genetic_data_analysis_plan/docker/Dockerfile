@@ -146,7 +146,7 @@ RUN wget https://www.well.ox.ac.uk/~gav/resources/qctool_v2.2.0-CentOS_Linux7.8.
 #     mv gtool /usr/local/bin/ && \
 #     mv example/ ./gtool_example
 # Install R libraries for 02_longitudinal_gwas
-RUN R -e "install.packages('bigsnpr', 'lubridate', 'bigmemory')"
+RUN R -e "install.packages(c('bigsnpr', 'lubridate', 'bigmemory'), Ncpus = 4)"
 # Reset frontend to default
 ENV DEBIAN_FRONTEND=teletype
 # Set working directory for Docker
