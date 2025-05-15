@@ -11,7 +11,7 @@
 
 
 
-<title>WP3_longitudinalGWAS_toy_dataset_analysis_guidelines</title>
+<title>BETTER4U - WP3 - Analysis plan for longitudinal BMI/weight trajectories (toy dataset) v1.0</title>
 
 <script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
 // be compatible with the behavior of Pandoc < 2.8).
@@ -348,13 +348,12 @@ display: none;
 
 
 
+<h1 class="title toc-ignore">BETTER4U - WP3 - Analysis plan for
+longitudinal BMI/weight trajectories (toy dataset) v1.0</h1>
 
 </div>
 
 
-<div id="better4u---wp3---analysis-plan-for-longitudinal-bmiweight-trajectories-toy-dataset-v1.0" class="section level1">
-<h1>BETTER4U - WP3 - Analysis plan for longitudinal BMI/weight
-trajectories (toy dataset) v1.0</h1>
 <div id="authors" class="section level2">
 <h2>Authors</h2>
 <p><strong>Lampros Bouranis</strong> <sup>1</sup><br />
@@ -368,7 +367,6 @@ trajectories (toy dataset) v1.0</h1>
 <li>Panagiotis Moulos (<a href="mailto:moulos@fleming.gr" class="email">moulos@fleming.gr</a>)</li>
 <li>Jon Anders Eriksson (<a href="mailto:anders.eriksson@ut.ee" class="email">anders.eriksson@ut.ee</a>)</li>
 </ul>
-</div>
 </div>
 </div>
 <div id="introduction" class="section level1">
@@ -1372,41 +1370,300 @@ zip -r Toy_weight_elderly_fit_gcta_out.zip Toy_weight_elderly_fit_gcta_out.fastG
 <div id="irregular-time-intervals---r" class="section level3">
 <h3>Irregular time intervals - R</h3>
 <p><strong>Step 1: Extract the SNP IDs</strong></p>
-<pre><code>cd /media/raid/storage0/data/phen/HUA_biobank/B4U_WP3_LongitudinalDataset/Toy_example/
+<pre><code>cd your_path/
 awk &#39;{print $2}&#39; ./Data/B4U_HUA_toy_genetics.bim &gt; ./Data/B4U_HUA_toy_genetics_SNP_IDs.txt</code></pre>
 <p><strong>Step 2: Compute the SNP effect size estimates</strong></p>
 <p>Please note that loading the genotype file to memory is likely to run
 into memory issues. Assuming 4 bytes per genotype and 500K loci, the
 estimated size in gigabytes (Gb) increases linearly with sample
 size:</p>
-<p>```{r echo = FALSE, warning = FALSE} library(ggplot2)</p>
-</div>
-</div>
-</div>
-<div id="source-httpscran.rstudio.comwebpackagesgeniovignettesgenio.html" class="section level1">
-<h1>Source: <a href="https://cran.rstudio.com/web/packages/genio/vignettes/genio.html" class="uri">https://cran.rstudio.com/web/packages/genio/vignettes/genio.html</a></h1>
-</div>
-<div id="constants" class="section level1">
-<h1>Constants</h1>
-<p>bytes_per_genotype &lt;- 4 bytes_per_gb &lt;- 1024 ^ 3</p>
-</div>
-<div id="example-data-dimensions" class="section level1">
-<h1>Example data dimensions</h1>
-<p>num_ind &lt;- seq(1000, 200000, by = 5000) num_loci &lt;- 500000</p>
-</div>
-<div id="gigabytes-per-1000-individuals-for-a-typical-genotyping-array" class="section level1">
-<h1>Gigabytes per 1000 individuals for a typical genotyping array</h1>
-<p>gb_estimates &lt;- round(bytes_per_genotype * num_ind * num_loci /
-bytes_per_gb, 2)</p>
-<p>comparison &lt;- data.frame(Samples = num_ind, Gb = gb_estimates)</p>
-<p>ggplot(comparison, aes(x = Samples, y = Gb)) + geom_line() +
-geom_point() + labs(x = “Sample size”, y = “Memory consumption (Gb)”) +
-theme_classic()</p>
-<pre><code>
-To address this issue, as well as the scalability of the regression models that are implemented throughout the process, we have taken advantage of the functionalities of the R libraries [bigsnpr](https://pmc.ncbi.nlm.nih.gov/articles/PMC6084588/), [bigstatsr](https://cran.r-project.org/web/packages/bigstatsr/index.html), [bigmemory](https://cran.r-project.org/web/packages/bigmemory/index.html). To install such libraries in your machine, please use the instructions at the beginning of section *Phenotype file data management*.
+<p><img src="data:image/png;base64,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" width="672" /></p>
+<p>To address this issue, as well as the scalability of the regression
+models that are implemented throughout the process, we have taken
+advantage of the functionalities of the R libraries <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC6084588/">bigsnpr</a>, <a href="https://cran.r-project.org/web/packages/bigstatsr/index.html">bigstatsr</a>,
+<a href="https://cran.r-project.org/web/packages/bigmemory/index.html">bigmemory</a>.
+To install such libraries in your machine, please use the instructions
+at the beginning of section <em>Phenotype file data management</em>.</p>
+<p>First, perform a dummy implementation of the regression model in GCTA
+to extract SNP-specific information for the required fields
+<code>CHR, SNP, POS, A1, A2, N, AF1</code> in the summary statistics
+files.</p>
+<p><strong><em>Preparation of covariate and phenotype
+files</em></strong></p>
+<pre class="r"><code>Rscript \
+-e &#39;{
+###########################################################################
+#
+# Libraries
+#
+###########################################################################
+lib &lt;- c(&quot;tidyr&quot;,
+         &quot;dplyr&quot;,
+         &quot;lubridate&quot;,
+         &quot;data.table&quot;)
+lapply(lib, require, character.only = TRUE)
 
-```r
-Rscript \
+###########################################################################
+#
+# Paths
+#
+###########################################################################
+
+main_path &lt;- &quot;//your_path//&quot;
+ 
+###########################################################################
+#
+# Data management - phenotype + PCA file
+#
+###########################################################################
+proj           &lt;- read.delim(paste0(main_path, &quot;B4U_HUA_toy_projections.txt&quot;))
+proj$FID_IID   &lt;- paste(proj$FID, proj$IID, sep = &quot;_&quot;)
+proj_cols_keep &lt;- c(&quot;FID_IID&quot;,
+                    &quot;FID&quot;,
+                    &quot;IID&quot;,
+                    paste0(&quot;PC&quot;,1:10))
+proj           &lt;- proj[proj_cols_keep]
+
+# Round eigenvectors to the 3rd digit
+for ( i in 4:ncol(proj )) proj[,i] &lt;- round(proj[,i],3)
+
+sumstats_BMI_adulthood &lt;- 
+ data.table::fread(paste0(main_path, &quot;Toy_bmi_summary_adults.txt&quot;),    
+                   header = TRUE)
+sumstats_BMI_elderly &lt;- 
+ data.table::fread(paste0(main_path, &quot;Toy_bmi_summary_elderly.txt&quot;),    
+                   header = TRUE)
+sumstats_weight_adulthood &lt;- 
+ data.table::fread(paste0(main_path, &quot;Toy_weight_summary_adults.txt&quot;),  
+                   header = TRUE)
+sumstats_weight_elderly   &lt;- 
+ data.table::fread(paste0(main_path, &quot;Toy_weight_summary_elderly.txt&quot;), 
+                   header = TRUE)
+
+class(sumstats_BMI_adulthood) &lt;- 
+ class(sumstats_BMI_elderly) &lt;- 
+  class(sumstats_weight_adulthood) &lt;- 
+   class(sumstats_weight_elderly) &lt;- class(sumstats_weight_elderly)[2] 
+
+sumstats_BMI_adulthood &lt;- 
+  sumstats_BMI_adulthood %&gt;% 
+  left_join(proj, c(&quot;FID_IID&quot; = &quot;FID_IID&quot;))
+
+sumstats_BMI_elderly &lt;- 
+  sumstats_BMI_elderly %&gt;% 
+  left_join(proj, c(&quot;FID_IID&quot; = &quot;FID_IID&quot;))
+
+sumstats_weight_adulthood &lt;- 
+  sumstats_weight_adulthood %&gt;% 
+  left_join(proj, c(&quot;FID_IID&quot; = &quot;FID_IID&quot;))
+
+sumstats_weight_elderly &lt;- 
+  sumstats_weight_elderly %&gt;% 
+  left_join(proj, c(&quot;FID_IID&quot; = &quot;FID_IID&quot;))
+
+#---- Export datasets for BMI:
+bmi_keep_adulthood       &lt;- c(&quot;FID&quot;, &quot;IID&quot;, &quot;BMI_Beta&quot;)
+bmi_qcovs_keep_adulthood &lt;- c(&quot;FID&quot;, &quot;IID&quot;, &quot;M_Age&quot;, paste0(&quot;PC&quot;,1:10))
+bmi_ccovs_keep_adulthood &lt;- c(&quot;FID&quot;, &quot;IID&quot;, &quot;Sex&quot;)
+
+write.table(sumstats_BMI_adulthood[bmi_keep_adulthood],
+            file      = paste0(main_path, &quot;Toy_bmi_adults_gcta_phenotype.txt&quot;),
+            row.names = FALSE,
+            quote     = FALSE)
+
+write.table(sumstats_BMI_adulthood[, bmi_qcovs_keep_adulthood, drop = FALSE],
+            file      = paste0(main_path, &quot;Toy_bmi_adults_gcta_q_covariates.txt&quot;),
+            row.names = FALSE,
+            quote     = FALSE)
+
+write.table(sumstats_BMI_adulthood[,bmi_ccovs_keep_adulthood, drop = FALSE],
+            file      = paste0(main_path, &quot;Toy_bmi_adults_gcta_c_covariates.txt&quot;),
+            row.names = FALSE,
+            quote     = FALSE)
+
+write.table(sumstats_BMI_elderly[bmi_keep_adulthood],
+            file      = paste0(main_path, &quot;Toy_bmi_elderly_gcta_phenotype.txt&quot;),
+            row.names = FALSE,
+            quote     = FALSE)
+
+write.table(sumstats_BMI_elderly[, bmi_qcovs_keep_adulthood, drop = FALSE],
+            file      = paste0(main_path, &quot;Toy_bmi_elderly_gcta_q_covariates.txt&quot;),
+            row.names = FALSE,
+            quote     = FALSE)
+
+write.table(sumstats_BMI_elderly[,bmi_ccovs_keep_adulthood, drop = FALSE],
+            file      = paste0(main_path, &quot;Toy_bmi_elderly_gcta_c_covariates.txt&quot;),
+            row.names = FALSE,
+            quote     = FALSE)
+
+#---- Export datasets for weight:
+weight_keep_adulthood       &lt;- c(&quot;FID&quot;, &quot;IID&quot;, &quot;Weight_Beta&quot;)
+weight_qcovs_keep_adulthood &lt;- c(&quot;FID&quot;, &quot;IID&quot;, &quot;M_Age&quot;, paste0(&quot;PC&quot;,1:10))
+weight_ccovs_keep_adulthood &lt;- c(&quot;FID&quot;, &quot;IID&quot;, &quot;Sex&quot;)
+
+write.table(sumstats_weight_adulthood[weight_keep_adulthood],
+            file      = paste0(main_path, &quot;Toy_weight_adults_gcta_phenotype.txt&quot;),
+            row.names = FALSE,
+            quote     = FALSE)
+
+write.table(sumstats_weight_adulthood[, weight_qcovs_keep_adulthood, drop = FALSE],
+            file      = paste0(main_path, &quot;Toy_weight_adults_gcta_q_covariates.txt&quot;),
+            row.names = FALSE,
+            quote     = FALSE)
+
+write.table(sumstats_weight_adulthood[,weight_ccovs_keep_adulthood, drop = FALSE],
+            file      = paste0(main_path, &quot;Toy_weight_adults_gcta_c_covariates.txt&quot;),
+            row.names = FALSE,
+            quote     = FALSE)
+
+write.table(sumstats_weight_elderly[weight_keep_adulthood],
+            file      = paste0(main_path, &quot;Toy_weight_elderly_gcta_phenotype.txt&quot;),
+            row.names = FALSE,
+            quote     = FALSE)
+
+write.table(sumstats_weight_elderly[, weight_qcovs_keep_adulthood, drop = FALSE],
+            file      = paste0(main_path, &quot;Toy_weight_elderly_gcta_q_covariates.txt&quot;),
+            row.names = FALSE,
+            quote     = FALSE)
+
+write.table(sumstats_weight_elderly[,weight_ccovs_keep_adulthood, drop = FALSE],
+            file      = paste0(main_path, &quot;Toy_weight_elderly_gcta_c_covariates.txt&quot;),
+            row.names = FALSE,
+            quote     = FALSE)
+    
+#---- Export the unique sample IDs per age group:
+write.table(sumstats_BMI_adulthood[c(&quot;FID&quot;, &quot;IID&quot;)],
+            paste0(main_path, &quot;Toy_bmi_adults_IDs.txt&quot;),
+            sep      = &quot;\t&quot;,
+            quote    = F,
+            row.names= F,
+            col.names= F)
+
+write.table(sumstats_BMI_elderly[c(&quot;FID&quot;, &quot;IID&quot;)],
+            paste0(main_path, &quot;Toy_bmi_elderly_IDs.txt&quot;),
+            sep      = &quot;\t&quot;,
+            quote    = F,
+            row.names= F,
+            col.names= F)
+
+write.table(sumstats_weight_adulthood[c(&quot;FID&quot;, &quot;IID&quot;)],
+            paste0(main_path, &quot;Toy_weight_adults_IDs.txt&quot;),
+            sep      = &quot;\t&quot;,
+            quote    = F,
+            row.names= F,
+            col.names= F)
+
+write.table(sumstats_weight_elderly[c(&quot;FID&quot;, &quot;IID&quot;)],
+            paste0(main_path, &quot;Toy_weight_elderly_IDs.txt&quot;),
+            sep      = &quot;\t&quot;,
+            quote    = F,
+            row.names= F,
+            col.names= F)
+}&#39;</code></pre>
+<pre><code>plink \
+--bfile B4U_HUA_toy_genetics \
+--keep Toy_bmi_adults_IDs.txt \
+--make-bed \
+--out Toy_bmi_adults_2
+
+plink \
+--bfile B4U_HUA_toy_genetics \
+--keep Toy_bmi_elderly_IDs.txt \
+--make-bed \
+--out Toy_bmi_elderly_2
+
+plink \
+--bfile B4U_HUA_toy_genetics \
+--keep Toy_weight_adults_IDs.txt \
+--make-bed \
+--out Toy_weight_adults_2
+
+plink \
+--bfile B4U_HUA_toy_genetics \
+--keep Toy_weight_elderly_IDs.txt \
+--make-bed \
+--out Toy_weight_elderly_2
+
+#---- BMI - Adults
+gcta64 \
+--fastGWA-lr \
+--est-vg HE \
+--bfile Toy_bmi_adults_2 \
+--pheno Toy_bmi_adults_gcta_phenotype.txt \
+--qcovar Toy_bmi_adults_gcta_q_covariates.txt \
+--covar Toy_bmi_adults_gcta_c_covariates.txt \
+--model-only \
+--nofilter \
+--thread-num 4 \
+--out Toy_bmi_adults_dummy_fit_gcta
+
+gcta64 \
+--bfile Toy_bmi_adults_2 \
+--nofilter \
+--load-model Toy_bmi_adults_dummy_fit_gcta.fastGWA \
+--out Toy_bmi_adults_dummy_fit_gcta_out \
+--thread-num 4
+
+#---- BMI - Elderly
+gcta64 \
+--fastGWA-lr \
+--est-vg HE \
+--bfile Toy_bmi_elderly_2 \
+--pheno Toy_bmi_elderly_gcta_phenotype.txt \
+--qcovar Toy_bmi_elderly_gcta_q_covariates.txt \
+--covar Toy_bmi_elderly_gcta_c_covariates.txt \
+--model-only \
+--nofilter \
+--thread-num 4 \
+--out Toy_bmi_elderly_dummy_fit_gcta
+
+gcta64 \
+--bfile Toy_bmi_elderly_2 \
+--nofilter \
+--load-model Toy_bmi_elderly_dummy_fit_gcta.fastGWA \
+--out Toy_bmi_elderly_dummy_fit_gcta_out \
+--thread-num 4
+
+#---- Weight - Adults
+gcta64 \
+--fastGWA-lr \
+--est-vg HE \
+--bfile Toy_weight_adults_2 \
+--pheno Toy_weight_adults_gcta_phenotype.txt \
+--qcovar Toy_weight_adults_gcta_q_covariates.txt \
+--covar Toy_weight_adults_gcta_c_covariates.txt \
+--model-only \
+--nofilter \
+--thread-num 4 \
+--out Toy_weight_adults_dummy_fit_gcta
+
+gcta64 \
+--bfile Toy_weight_adults_2 \
+--nofilter \
+--load-model Toy_weight_adults_dummy_fit_gcta.fastGWA \
+--out Toy_weight_adults_dummy_fit_gcta_out \
+--thread-num 4
+
+#---- Weight - Elderly
+gcta64 \
+--fastGWA-lr \
+--est-vg HE \
+--bfile Toy_weight_elderly_2 \
+--pheno Toy_weight_elderly_gcta_phenotype.txt \
+--qcovar Toy_weight_elderly_gcta_q_covariates.txt \
+--covar Toy_weight_elderly_gcta_c_covariates.txt \
+--model-only \
+--nofilter \
+--thread-num 4 \
+--out Toy_weight_elderly_dummy_fit_gcta
+
+gcta64 \
+--bfile Toy_weight_elderly_2 \
+--nofilter \
+--load-model Toy_weight_elderly_dummy_fit_gcta.fastGWA \
+--out Toy_weight_elderly_dummy_fit_gcta_out \
+--thread-num 4</code></pre>
+<pre class="r"><code>Rscript \
 -e &#39;{
 ###########################################################################
 #
@@ -1468,6 +1725,22 @@ sumstats_weight_elderly   &lt;- data.table::fread(paste0(main_path, &quot;Output
 SNP_IDs                   &lt;- data.table::fread(paste0(main_path, &quot;Data//&quot;, &quot;B4U_HUA_toy_genetics_SNP_IDs.txt&quot;),     header = FALSE)
 colnames(SNP_IDs)[1]      &lt;- &quot;SNP_ID&quot;
 SNP_IDs                   &lt;- as.data.frame(SNP_IDs)
+
+Toy_bmi_adults_SNP_info   &lt;- data.table::fread(paste0(main_path, &quot;Output//&quot;, &quot;Toy_bmi_adults_dummy_fit_gcta_out.fastGWA&quot;), header = TRUE)
+Toy_bmi_adults_SNP_info   &lt;- as.data.frame(Toy_bmi_adults_SNP_info)
+Toy_bmi_adults_SNP_info   &lt;- Toy_bmi_adults_SNP_info[c(&quot;CHR&quot;, &quot;SNP&quot;, &quot;POS&quot;, &quot;A1&quot;, &quot;A2&quot;, &quot;N&quot;, &quot;AF1&quot;)]
+
+Toy_bmi_elderly_SNP_info &lt;- data.table::fread(paste0(main_path, &quot;Output//&quot;, &quot;Toy_bmi_elderly_dummy_fit_gcta_out.fastGWA&quot;), header = TRUE)
+Toy_bmi_elderly_SNP_info &lt;- as.data.frame(Toy_bmi_elderly_SNP_info)
+Toy_bmi_elderly_SNP_info &lt;- Toy_bmi_elderly_SNP_info[c(&quot;CHR&quot;, &quot;SNP&quot;, &quot;POS&quot;, &quot;A1&quot;, &quot;A2&quot;, &quot;N&quot;, &quot;AF1&quot;)]
+
+Toy_weight_adults_SNP_info   &lt;- data.table::fread(paste0(main_path, &quot;Output//&quot;, &quot;Toy_weight_adults_dummy_fit_gcta_out.fastGWA&quot;), header = TRUE)
+Toy_weight_adults_SNP_info   &lt;- as.data.frame(Toy_weight_adults_SNP_info)
+Toy_weight_adults_SNP_info   &lt;- Toy_weight_adults_SNP_info[c(&quot;CHR&quot;, &quot;SNP&quot;, &quot;POS&quot;, &quot;A1&quot;, &quot;A2&quot;, &quot;N&quot;, &quot;AF1&quot;)]
+
+Toy_weight_elderly_SNP_info  &lt;- data.table::fread(paste0(main_path, &quot;Output//&quot;, &quot;Toy_weight_elderly_dummy_fit_gcta_out.fastGWA&quot;), header = TRUE)
+Toy_weight_elderly_SNP_info  &lt;- as.data.frame(Toy_weight_elderly_SNP_info)
+Toy_weight_elderly_SNP_info  &lt;- Toy_weight_elderly_SNP_info[c(&quot;CHR&quot;, &quot;SNP&quot;, &quot;POS&quot;, &quot;A1&quot;, &quot;A2&quot;, &quot;N&quot;, &quot;AF1&quot;)]
 
 ###########################################################################
 #
@@ -1572,6 +1845,9 @@ genotype_matrix_weight_elderly   &lt;- FBM(nrow = nrow(sumstats_weight_elderly),
                                         ncol = ncol(genotype_matrix), 
                                         init = genotype_matrix[weight_elderly_samples_keep,])
 
+# Check that all SNPs are included:
+ncol(genotype_matrix_BMI_adulthood) == nrow(Toy_weight_elderly_SNP_info)
+
 ###########################################################################
 #
 # Modeling - estimation of SNP effect sizes
@@ -1582,6 +1858,7 @@ genotype_matrix_weight_elderly   &lt;- FBM(nrow = nrow(sumstats_weight_elderly),
 modeling_BMI_adulthood    &lt;- modeling_fun(pheno_data = sumstats_BMI_adulthood,
                                           geno_data  = genotype_matrix_BMI_adulthood,
                                           SNP_IDs    = SNP_IDs,
+                                          SNP_info   = Toy_bmi_adults_SNP_info,
                                           pheno      = &quot;BMI&quot;
                                           )
 
@@ -1604,6 +1881,7 @@ rm(modeling_BMI_adulthood)
 modeling_BMI_elderly      &lt;- modeling_fun(pheno_data = sumstats_BMI_elderly,
                                           geno_data  = genotype_matrix_BMI_elderly,
                                           SNP_IDs    = SNP_IDs,
+                                          SNP_info   = Toy_bmi_elderly_SNP_info,
                                           pheno      = &quot;BMI&quot;)
 
 write.table(modeling_BMI_elderly$Effect_sizes,
@@ -1625,6 +1903,7 @@ rm(modeling_BMI_elderly)
 modeling_weight_adulthood &lt;- modeling_fun(pheno_data = sumstats_weight_adulthood,
                                           geno_data  = genotype_matrix_weight_adulthood,
                                           SNP_IDs    = SNP_IDs,
+                                          SNP_info   = Toy_weight_adults_SNP_info,
                                           pheno      = &quot;Weight&quot;)
 
 write.table(modeling_weight_adulthood$Effect_sizes,
@@ -1646,6 +1925,7 @@ rm(modeling_weight_adulthood)
 modeling_weight_elderly   &lt;- modeling_fun(pheno_data = sumstats_weight_elderly,
                                           geno_data  = genotype_matrix_weight_elderly,
                                           SNP_IDs    = SNP_IDs,
+                                          SNP_info   = Toy_weight_elderly_SNP_info,
                                           pheno      = &quot;Weight&quot;)
 write.table(modeling_weight_elderly$Effect_sizes,
             paste0(main_path, &quot;Output//&quot;, &quot;Toy_weight_modeling_elderly.txt&quot;),
@@ -1665,13 +1945,15 @@ rm(modeling_weight_elderly)
 <p>The summary statistics are in <code>..._modeling_...txt</code>.</p>
 <p>The estimated ratio of the sampling noise to individual environmental
 noise is in <code>..._varratio_...txt</code>.</p>
-<p><strong>Step 2: Compress effect size estimates statistics files and
+<p><strong>Step 4: Compress effect size estimates statistics files and
 upload</strong></p>
 <pre><code>zip -r Toy_bmi_modeling_adults.zip Toy_bmi_modeling_adults.txt
 zip -r Toy_bmi_modeling_elderly.zip Toy_bmi_modeling_elderly.txt
 
 zip -r Toy_weight_modeling_adults.zip Toy_weight_modeling_adults.txt
 zip -r Toy_weight_modeling_elderly.zip Toy_weight_modeling_elderly.txt</code></pre>
+</div>
+</div>
 <div id="upload-results" class="section level2">
 <h2>Upload results</h2>
 <ul>

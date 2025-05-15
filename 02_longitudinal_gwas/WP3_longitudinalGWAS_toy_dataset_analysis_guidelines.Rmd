@@ -971,7 +971,7 @@ zip -r Toy_weight_elderly_fit_gcta_out.zip Toy_weight_elderly_fit_gcta_out.fastG
 **Step 1: Extract the SNP IDs**
 
 ```
-cd /media/raid/storage0/data/phen/HUA_biobank/B4U_WP3_LongitudinalDataset/Toy_example/
+cd your_path/
 awk '{print $2}' ./Data/B4U_HUA_toy_genetics.bim > ./Data/B4U_HUA_toy_genetics_SNP_IDs.txt
 ```
 
@@ -1010,6 +1010,289 @@ ggplot(comparison,
 ```
 
 To address this issue, as well as the scalability of the regression models that are implemented throughout the process, we have taken advantage of the functionalities of the R libraries [bigsnpr](https://pmc.ncbi.nlm.nih.gov/articles/PMC6084588/), [bigstatsr](https://cran.r-project.org/web/packages/bigstatsr/index.html), [bigmemory](https://cran.r-project.org/web/packages/bigmemory/index.html). To install such libraries in your machine, please use the instructions at the beginning of section *Phenotype file data management*.
+
+First, perform a dummy implementation of the regression model in GCTA to extract SNP-specific information for the required fields `CHR, SNP, POS, A1, A2, N, AF1` in the summary statistics files.
+
+***Preparation of covariate and phenotype files*** 
+
+```r
+Rscript \
+-e '{
+###########################################################################
+#
+# Libraries
+#
+###########################################################################
+lib <- c("tidyr",
+         "dplyr",
+         "lubridate",
+         "data.table")
+lapply(lib, require, character.only = TRUE)
+
+###########################################################################
+#
+# Paths
+#
+###########################################################################
+
+main_path <- "//your_path//"
+ 
+###########################################################################
+#
+# Data management - phenotype + PCA file
+#
+###########################################################################
+proj           <- read.delim(paste0(main_path, "B4U_HUA_toy_projections.txt"))
+proj$FID_IID   <- paste(proj$FID, proj$IID, sep = "_")
+proj_cols_keep <- c("FID_IID",
+                    "FID",
+                    "IID",
+                    paste0("PC",1:10))
+proj           <- proj[proj_cols_keep]
+
+# Round eigenvectors to the 3rd digit
+for ( i in 4:ncol(proj )) proj[,i] <- round(proj[,i],3)
+
+sumstats_BMI_adulthood <- 
+ data.table::fread(paste0(main_path, "Toy_bmi_summary_adults.txt"),    
+                   header = TRUE)
+sumstats_BMI_elderly <- 
+ data.table::fread(paste0(main_path, "Toy_bmi_summary_elderly.txt"),    
+                   header = TRUE)
+sumstats_weight_adulthood <- 
+ data.table::fread(paste0(main_path, "Toy_weight_summary_adults.txt"),  
+                   header = TRUE)
+sumstats_weight_elderly   <- 
+ data.table::fread(paste0(main_path, "Toy_weight_summary_elderly.txt"), 
+                   header = TRUE)
+
+class(sumstats_BMI_adulthood) <- 
+ class(sumstats_BMI_elderly) <- 
+  class(sumstats_weight_adulthood) <- 
+   class(sumstats_weight_elderly) <- class(sumstats_weight_elderly)[2] 
+
+sumstats_BMI_adulthood <- 
+  sumstats_BMI_adulthood %>% 
+  left_join(proj, c("FID_IID" = "FID_IID"))
+
+sumstats_BMI_elderly <- 
+  sumstats_BMI_elderly %>% 
+  left_join(proj, c("FID_IID" = "FID_IID"))
+
+sumstats_weight_adulthood <- 
+  sumstats_weight_adulthood %>% 
+  left_join(proj, c("FID_IID" = "FID_IID"))
+
+sumstats_weight_elderly <- 
+  sumstats_weight_elderly %>% 
+  left_join(proj, c("FID_IID" = "FID_IID"))
+
+#---- Export datasets for BMI:
+bmi_keep_adulthood       <- c("FID", "IID", "BMI_Beta")
+bmi_qcovs_keep_adulthood <- c("FID", "IID", "M_Age", paste0("PC",1:10))
+bmi_ccovs_keep_adulthood <- c("FID", "IID", "Sex")
+
+write.table(sumstats_BMI_adulthood[bmi_keep_adulthood],
+            file      = paste0(main_path, "Toy_bmi_adults_gcta_phenotype.txt"),
+            row.names = FALSE,
+            quote     = FALSE)
+
+write.table(sumstats_BMI_adulthood[, bmi_qcovs_keep_adulthood, drop = FALSE],
+            file      = paste0(main_path, "Toy_bmi_adults_gcta_q_covariates.txt"),
+            row.names = FALSE,
+            quote     = FALSE)
+
+write.table(sumstats_BMI_adulthood[,bmi_ccovs_keep_adulthood, drop = FALSE],
+            file      = paste0(main_path, "Toy_bmi_adults_gcta_c_covariates.txt"),
+            row.names = FALSE,
+            quote     = FALSE)
+
+write.table(sumstats_BMI_elderly[bmi_keep_adulthood],
+            file      = paste0(main_path, "Toy_bmi_elderly_gcta_phenotype.txt"),
+            row.names = FALSE,
+            quote     = FALSE)
+
+write.table(sumstats_BMI_elderly[, bmi_qcovs_keep_adulthood, drop = FALSE],
+            file      = paste0(main_path, "Toy_bmi_elderly_gcta_q_covariates.txt"),
+            row.names = FALSE,
+            quote     = FALSE)
+
+write.table(sumstats_BMI_elderly[,bmi_ccovs_keep_adulthood, drop = FALSE],
+            file      = paste0(main_path, "Toy_bmi_elderly_gcta_c_covariates.txt"),
+            row.names = FALSE,
+            quote     = FALSE)
+
+#---- Export datasets for weight:
+weight_keep_adulthood       <- c("FID", "IID", "Weight_Beta")
+weight_qcovs_keep_adulthood <- c("FID", "IID", "M_Age", paste0("PC",1:10))
+weight_ccovs_keep_adulthood <- c("FID", "IID", "Sex")
+
+write.table(sumstats_weight_adulthood[weight_keep_adulthood],
+            file      = paste0(main_path, "Toy_weight_adults_gcta_phenotype.txt"),
+            row.names = FALSE,
+            quote     = FALSE)
+
+write.table(sumstats_weight_adulthood[, weight_qcovs_keep_adulthood, drop = FALSE],
+            file      = paste0(main_path, "Toy_weight_adults_gcta_q_covariates.txt"),
+            row.names = FALSE,
+            quote     = FALSE)
+
+write.table(sumstats_weight_adulthood[,weight_ccovs_keep_adulthood, drop = FALSE],
+            file      = paste0(main_path, "Toy_weight_adults_gcta_c_covariates.txt"),
+            row.names = FALSE,
+            quote     = FALSE)
+
+write.table(sumstats_weight_elderly[weight_keep_adulthood],
+            file      = paste0(main_path, "Toy_weight_elderly_gcta_phenotype.txt"),
+            row.names = FALSE,
+            quote     = FALSE)
+
+write.table(sumstats_weight_elderly[, weight_qcovs_keep_adulthood, drop = FALSE],
+            file      = paste0(main_path, "Toy_weight_elderly_gcta_q_covariates.txt"),
+            row.names = FALSE,
+            quote     = FALSE)
+
+write.table(sumstats_weight_elderly[,weight_ccovs_keep_adulthood, drop = FALSE],
+            file      = paste0(main_path, "Toy_weight_elderly_gcta_c_covariates.txt"),
+            row.names = FALSE,
+            quote     = FALSE)
+    
+#---- Export the unique sample IDs per age group:
+write.table(sumstats_BMI_adulthood[c("FID", "IID")],
+            paste0(main_path, "Toy_bmi_adults_IDs.txt"),
+            sep      = "\t",
+            quote    = F,
+            row.names= F,
+            col.names= F)
+
+write.table(sumstats_BMI_elderly[c("FID", "IID")],
+            paste0(main_path, "Toy_bmi_elderly_IDs.txt"),
+            sep      = "\t",
+            quote    = F,
+            row.names= F,
+            col.names= F)
+
+write.table(sumstats_weight_adulthood[c("FID", "IID")],
+            paste0(main_path, "Toy_weight_adults_IDs.txt"),
+            sep      = "\t",
+            quote    = F,
+            row.names= F,
+            col.names= F)
+
+write.table(sumstats_weight_elderly[c("FID", "IID")],
+            paste0(main_path, "Toy_weight_elderly_IDs.txt"),
+            sep      = "\t",
+            quote    = F,
+            row.names= F,
+            col.names= F)
+}'
+```
+
+```
+plink \
+--bfile B4U_HUA_toy_genetics \
+--keep Toy_bmi_adults_IDs.txt \
+--make-bed \
+--out Toy_bmi_adults_2
+
+plink \
+--bfile B4U_HUA_toy_genetics \
+--keep Toy_bmi_elderly_IDs.txt \
+--make-bed \
+--out Toy_bmi_elderly_2
+
+plink \
+--bfile B4U_HUA_toy_genetics \
+--keep Toy_weight_adults_IDs.txt \
+--make-bed \
+--out Toy_weight_adults_2
+
+plink \
+--bfile B4U_HUA_toy_genetics \
+--keep Toy_weight_elderly_IDs.txt \
+--make-bed \
+--out Toy_weight_elderly_2
+
+#---- BMI - Adults
+gcta64 \
+--fastGWA-lr \
+--est-vg HE \
+--bfile Toy_bmi_adults_2 \
+--pheno Toy_bmi_adults_gcta_phenotype.txt \
+--qcovar Toy_bmi_adults_gcta_q_covariates.txt \
+--covar Toy_bmi_adults_gcta_c_covariates.txt \
+--model-only \
+--nofilter \
+--thread-num 4 \
+--out Toy_bmi_adults_dummy_fit_gcta
+
+gcta64 \
+--bfile Toy_bmi_adults_2 \
+--nofilter \
+--load-model Toy_bmi_adults_dummy_fit_gcta.fastGWA \
+--out Toy_bmi_adults_dummy_fit_gcta_out \
+--thread-num 4
+
+#---- BMI - Elderly
+gcta64 \
+--fastGWA-lr \
+--est-vg HE \
+--bfile Toy_bmi_elderly_2 \
+--pheno Toy_bmi_elderly_gcta_phenotype.txt \
+--qcovar Toy_bmi_elderly_gcta_q_covariates.txt \
+--covar Toy_bmi_elderly_gcta_c_covariates.txt \
+--model-only \
+--nofilter \
+--thread-num 4 \
+--out Toy_bmi_elderly_dummy_fit_gcta
+
+gcta64 \
+--bfile Toy_bmi_elderly_2 \
+--nofilter \
+--load-model Toy_bmi_elderly_dummy_fit_gcta.fastGWA \
+--out Toy_bmi_elderly_dummy_fit_gcta_out \
+--thread-num 4
+
+#---- Weight - Adults
+gcta64 \
+--fastGWA-lr \
+--est-vg HE \
+--bfile Toy_weight_adults_2 \
+--pheno Toy_weight_adults_gcta_phenotype.txt \
+--qcovar Toy_weight_adults_gcta_q_covariates.txt \
+--covar Toy_weight_adults_gcta_c_covariates.txt \
+--model-only \
+--nofilter \
+--thread-num 4 \
+--out Toy_weight_adults_dummy_fit_gcta
+
+gcta64 \
+--bfile Toy_weight_adults_2 \
+--nofilter \
+--load-model Toy_weight_adults_dummy_fit_gcta.fastGWA \
+--out Toy_weight_adults_dummy_fit_gcta_out \
+--thread-num 4
+
+#---- Weight - Elderly
+gcta64 \
+--fastGWA-lr \
+--est-vg HE \
+--bfile Toy_weight_elderly_2 \
+--pheno Toy_weight_elderly_gcta_phenotype.txt \
+--qcovar Toy_weight_elderly_gcta_q_covariates.txt \
+--covar Toy_weight_elderly_gcta_c_covariates.txt \
+--model-only \
+--nofilter \
+--thread-num 4 \
+--out Toy_weight_elderly_dummy_fit_gcta
+
+gcta64 \
+--bfile Toy_weight_elderly_2 \
+--nofilter \
+--load-model Toy_weight_elderly_dummy_fit_gcta.fastGWA \
+--out Toy_weight_elderly_dummy_fit_gcta_out \
+--thread-num 4
+```
 
 ```r
 Rscript \
@@ -1074,6 +1357,22 @@ sumstats_weight_elderly   <- data.table::fread(paste0(main_path, "Output//", "To
 SNP_IDs                   <- data.table::fread(paste0(main_path, "Data//", "B4U_HUA_toy_genetics_SNP_IDs.txt"),     header = FALSE)
 colnames(SNP_IDs)[1]      <- "SNP_ID"
 SNP_IDs                   <- as.data.frame(SNP_IDs)
+
+Toy_bmi_adults_SNP_info   <- data.table::fread(paste0(main_path, "Output//", "Toy_bmi_adults_dummy_fit_gcta_out.fastGWA"), header = TRUE)
+Toy_bmi_adults_SNP_info   <- as.data.frame(Toy_bmi_adults_SNP_info)
+Toy_bmi_adults_SNP_info   <- Toy_bmi_adults_SNP_info[c("CHR", "SNP", "POS", "A1", "A2", "N", "AF1")]
+
+Toy_bmi_elderly_SNP_info <- data.table::fread(paste0(main_path, "Output//", "Toy_bmi_elderly_dummy_fit_gcta_out.fastGWA"), header = TRUE)
+Toy_bmi_elderly_SNP_info <- as.data.frame(Toy_bmi_elderly_SNP_info)
+Toy_bmi_elderly_SNP_info <- Toy_bmi_elderly_SNP_info[c("CHR", "SNP", "POS", "A1", "A2", "N", "AF1")]
+
+Toy_weight_adults_SNP_info   <- data.table::fread(paste0(main_path, "Output//", "Toy_weight_adults_dummy_fit_gcta_out.fastGWA"), header = TRUE)
+Toy_weight_adults_SNP_info   <- as.data.frame(Toy_weight_adults_SNP_info)
+Toy_weight_adults_SNP_info   <- Toy_weight_adults_SNP_info[c("CHR", "SNP", "POS", "A1", "A2", "N", "AF1")]
+
+Toy_weight_elderly_SNP_info  <- data.table::fread(paste0(main_path, "Output//", "Toy_weight_elderly_dummy_fit_gcta_out.fastGWA"), header = TRUE)
+Toy_weight_elderly_SNP_info  <- as.data.frame(Toy_weight_elderly_SNP_info)
+Toy_weight_elderly_SNP_info  <- Toy_weight_elderly_SNP_info[c("CHR", "SNP", "POS", "A1", "A2", "N", "AF1")]
 
 ###########################################################################
 #
@@ -1178,6 +1477,9 @@ genotype_matrix_weight_elderly   <- FBM(nrow = nrow(sumstats_weight_elderly),
                                         ncol = ncol(genotype_matrix), 
                                         init = genotype_matrix[weight_elderly_samples_keep,])
 
+# Check that all SNPs are included:
+ncol(genotype_matrix_BMI_adulthood) == nrow(Toy_weight_elderly_SNP_info)
+
 ###########################################################################
 #
 # Modeling - estimation of SNP effect sizes
@@ -1188,6 +1490,7 @@ genotype_matrix_weight_elderly   <- FBM(nrow = nrow(sumstats_weight_elderly),
 modeling_BMI_adulthood    <- modeling_fun(pheno_data = sumstats_BMI_adulthood,
                                           geno_data  = genotype_matrix_BMI_adulthood,
                                           SNP_IDs    = SNP_IDs,
+                                          SNP_info   = Toy_bmi_adults_SNP_info,
                                           pheno      = "BMI"
                                           )
 
@@ -1210,6 +1513,7 @@ rm(modeling_BMI_adulthood)
 modeling_BMI_elderly      <- modeling_fun(pheno_data = sumstats_BMI_elderly,
                                           geno_data  = genotype_matrix_BMI_elderly,
                                           SNP_IDs    = SNP_IDs,
+                                          SNP_info   = Toy_bmi_elderly_SNP_info,
                                           pheno      = "BMI")
 
 write.table(modeling_BMI_elderly$Effect_sizes,
@@ -1231,6 +1535,7 @@ rm(modeling_BMI_elderly)
 modeling_weight_adulthood <- modeling_fun(pheno_data = sumstats_weight_adulthood,
                                           geno_data  = genotype_matrix_weight_adulthood,
                                           SNP_IDs    = SNP_IDs,
+                                          SNP_info   = Toy_weight_adults_SNP_info,
                                           pheno      = "Weight")
 
 write.table(modeling_weight_adulthood$Effect_sizes,
@@ -1252,6 +1557,7 @@ rm(modeling_weight_adulthood)
 modeling_weight_elderly   <- modeling_fun(pheno_data = sumstats_weight_elderly,
                                           geno_data  = genotype_matrix_weight_elderly,
                                           SNP_IDs    = SNP_IDs,
+                                          SNP_info   = Toy_weight_elderly_SNP_info,
                                           pheno      = "Weight")
 write.table(modeling_weight_elderly$Effect_sizes,
             paste0(main_path, "Output//", "Toy_weight_modeling_elderly.txt"),
@@ -1274,7 +1580,7 @@ The summary statistics are in `..._modeling_...txt`.
 
 The estimated ratio of the sampling noise to individual environmental noise is in `..._varratio_...txt`.
 
-**Step 2: Compress effect size estimates statistics files and upload**
+**Step 4: Compress effect size estimates statistics files and upload**
   
 ```
 zip -r Toy_bmi_modeling_adults.zip Toy_bmi_modeling_adults.txt
