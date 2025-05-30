@@ -117,3 +117,8 @@ Here are the versions of the user-specified R packages:
 | rmarkdown    | 2.27    |
 | SAIGE        | 1.3.6   |
 | lassosum     | 0.4.5   |
+| tidyr        | 1.3.1   |
+| dplyr        | 1.1.4   |
+| lubridate    | 1.9.4   |
+| data.table   | 1.16.0  |
+| bigmemory    | 4.6.4   |
