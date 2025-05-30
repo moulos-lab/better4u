@@ -11,9 +11,9 @@ BETTER4U - WP3 - Analysis plan for longitudinal BMI/weight trajectories (toy dat
 
 ### Contact details
 
-* Lampros Bouranis (lampros.bouranis@hua.gr)
 * Panagiotis Moulos (moulos@fleming.gr)
 * Jon Anders Eriksson (anders.eriksson@ut.ee)
+* Panagiotis Symianakis (psimiana@hua.gr)
 
 # Introduction
 
