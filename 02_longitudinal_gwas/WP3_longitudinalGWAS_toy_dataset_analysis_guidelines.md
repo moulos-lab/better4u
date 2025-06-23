@@ -781,30 +781,6 @@ gcta64 \
 --out Toy_weight_elderly_grm_sparse
 ```
 
-**Step 7: Perform pruning**
-
-```
-plink \
---bfile Toy_bmi_adults \
---out Toy_bmi_adults \
---indep-pairwise 50 5 0.2
-
-plink \
---bfile Toy_bmi_elderly \
---out Toy_bmi_elderly \
---indep-pairwise 50 5 0.2
-
-plink \
---bfile Toy_weight_adults \
---out Toy_weight_adults \
---indep-pairwise 50 5 0.2
-
-plink \
---bfile Toy_weight_elderly \
---out Toy_weight_elderly \
---indep-pairwise 50 5 0.2
-```
-
 #### Execute GCTA fastGWA with the toy dataset
 
 **Step 1: Keep sample IDs with complete covariate information**
@@ -978,7 +954,19 @@ Please note that loading the genotype file to memory is likely to run into memor
   <img src="memory_consumption.png" alt="Description of the image" width="600" height="600">
 </div>
 
-To address this issue, as well as the scalability of the regression models that are implemented throughout the process, we have taken advantage of the functionalities of the R libraries [bigsnpr](https://pmc.ncbi.nlm.nih.gov/articles/PMC6084588/), [bigstatsr](https://cran.r-project.org/web/packages/bigstatsr/index.html), [bigmemory](https://cran.r-project.org/web/packages/bigmemory/index.html). To install such libraries in your machine, please use the instructions at the beginning of section *Phenotype file data management*.
+To address this issue, as well as the scalability of the regression models that are implemented throughout the process, we have taken advantage of the functionalities of the R libraries [bigsnpr](https://pmc.ncbi.nlm.nih.gov/articles/PMC6084588/), [bigstatsr](https://cran.r-project.org/web/packages/bigstatsr/index.html), [bigmemory](https://cran.r-project.org/web/packages/bigmemory/index.html). To install such libraries in your machine, please use the instructions at the beginning of section *Phenotype file data management*. `bigstatsr` stores variant data in a filesystem-backed data structure which stores genotypes in the filesystem and the interact with R. **Note** that the default location where these files are stored is the `/tmp` directory and you have to make sure that it has enough space left to store your data. If not, you should specifically set this location using the `backingfile` argument in the `FBM` function below. The default is:
+
+```
+backingfile = tempfile(tmpdir = getOption("FBM.dir"))
+```
+
+which defaults to `file.path(tempdir(),basename(tempfile()))`. If there is not enough space, you should either:
+
+```
+options("FBM.dir") <- "PATH_TO_DIR_WITH_ENOUGH_SPACE"
+```
+
+at the beginning of the scripts or set the `backingfile` argument in the `FBM()` call.
 
 First, perform a dummy implementation of the regression model in GCTA to extract SNP-specific information for the required fields `CHR, SNP, POS, A1, A2, N, AF1` in the summary statistics files.
 
@@ -1429,21 +1417,25 @@ weight_elderly_samples_keep   <- proj$FID_IID %in% sumstats_weight_elderly$FID_I
 
 # In the genotype file, keep the rows that correspond to each summary stats file:
 genotype_matrix_BMI_adulthood    <- FBM(nrow = nrow(sumstats_BMI_adulthood),
-                                        ncol = ncol(genotype_matrix), 
+                                        ncol = ncol(genotype_matrix),
+                                        #backingfile = "PATH_TO_DIR_WITH_ENOUGH_SPACE_PLUS_FILENAME",
                                         init = genotype_matrix[BMI_adulthood_samples_keep,]#,
                                         #type = "integer"
                                         )
 
 genotype_matrix_BMI_elderly      <- FBM(nrow = nrow(sumstats_BMI_elderly),
-                                        ncol = ncol(genotype_matrix), 
+                                        ncol = ncol(genotype_matrix),
+                                        #backingfile = "PATH_TO_DIR_WITH_ENOUGH_SPACE_PLUS_FILENAME",
                                         init = genotype_matrix[BMI_elderly_samples_keep,])                                     
                                      
 genotype_matrix_weight_adulthood <- FBM(nrow = nrow(sumstats_weight_adulthood),
-                                        ncol = ncol(genotype_matrix), 
+                                        ncol = ncol(genotype_matrix),
+                                        #backingfile = "PATH_TO_DIR_WITH_ENOUGH_SPACE_PLUS_FILENAME",
                                         init = genotype_matrix[weight_adulthood_samples_keep,])
 
 genotype_matrix_weight_elderly   <- FBM(nrow = nrow(sumstats_weight_elderly),
-                                        ncol = ncol(genotype_matrix), 
+                                        ncol = ncol(genotype_matrix),
+                                        #backingfile = "PATH_TO_DIR_WITH_ENOUGH_SPACE_PLUS_FILENAME",
                                         init = genotype_matrix[weight_elderly_samples_keep,])
 
 # Check that all SNPs are included:
