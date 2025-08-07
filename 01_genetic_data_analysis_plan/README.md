@@ -1645,7 +1645,7 @@ done
 The summary statistics for each chromosome would then be in
 `fit_gcta_bmi_out_chr*.fastGWA`.
 
-## 3.3.4 GCTA fastGWA execution summary
+## 2.2.4 GCTA fastGWA execution summary
 
 For more clarity, we cite all the aforementioned steps in the following stepwise
 manner which can be used for execution:
@@ -1693,7 +1693,7 @@ plink \
 
 4. Create GRM and GRM sparse matrices with the above PLINK files
 
-4.1 GRM matrix
+GRM matrix
 
 ```bash
 gcta64 \
@@ -1704,7 +1704,7 @@ gcta64 \
   --out toyf_grm
 ```
 
-4.2 GRM sparse matrix
+GRM sparse matrix
 
 ```bash
 gcta64 \
