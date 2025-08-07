@@ -1428,92 +1428,19 @@ $$ \Delta BodyWeight(t) = age(t) + age(t)^2 + sex + YR + \sum_{i=1}^n PC_i + Oth
 
 4. Others *WIP*
 
-## 2.2 Analysis with REGENIE
+## 2.2 Analysis with GCTA
 
-## 2.2.1 Preparation of covariate and phenotype files
+## 2.2.1 Preparation of the Genetic Relationships Matrix (GRM)
 
-The covariate files should include covariates for each analysis mentioned above
-plus the PCs. Based on the accompanying toy dataset from HUA, we provide an
-example for case (i).
+The GRM is a prerequisite for using GCTA and can be constructed with the GCTA
+software taking into account sample relatedness as calculated with the KING
+software. We assume the toy dataset provided by HUA. If related individuals
+have been removed based on KING or PLINK IBD, then Step 1 below can be 
+excluded by also removing the `--keep individuals_unrelated.txt` PLINK argument
+in Step 2.
 
-For the covariate file, we need the phenotypes as well as the PCs. The PCs will
-be provided by the central analysis team. For this example, we calculate 10 PCs
-with PLINK.
-
-Firstly, perform pruning (will be done based on the reference panel for the
-canonical analysis):
-
-```bash
-plink \
-  --bfile toy \
-  --out toy \
-  --indep-pairwise 50 5 0.2
-```
-
-Then, calculate 10 PCs exluding the pruned SNPs:
-
-```bash
-plink \
-  --bfile toy \
-  --out toy \
-  --pca 10 header \
-  --exclude toy.prune.out
-```
-
-The output is written to `toy.eigenvec`. This is just for example purposes. 
-During the normal execution, you will not calculate PCs with PLINK but rather 
-use the PC projections file provided by the central analysis team or created by
-yourself using the set of SNPs provided by the central analysis team. We then
-construct the covariates and phenotype file:
-
-```r
-Rscript \
-  -e '{
-    # Read all phenotypes
-    phen <- read.delim("toy.txt")
-    
-    # Construct 1st part of covariates files
-    rownames(phen) <- phen$iid
-    phen$age2 <- phen$age^2
-    covs <- data.frame(
-      FID=phen$fid,
-      IID=phen$iid,
-      sex=phen$sex,
-      age=phen$age,
-      age2=phen$age2
-    )
-    
-    # 2nd part - PCs
-    pcs <- read.table("toy.eigenvec",header=TRUE)
-    rownames(pcs) <- pcs$IID
-    pcs <- pcs[rownames(phen),]
-    pcs <- pcs[,grep("PC",colnames(pcs))]
-    covs <- cbind(covs,pcs)
-    
-    # Write the covariates file
-    write.table(covs,file="toy_regenie_covariates.txt",row.names=FALSE,
-        quote=FALSE)
-    
-    # Construct the phenotype file
-    resp <- data.frame(
-      FID=phen$fid,
-      IID=phen$iid,
-      bmi=phen$bmi_b
-    )
-    write.table(resp,file="toy_regenie_phenotype.txt",row.names=FALSE,
-        quote=FALSE)
-  }'
-```
-
-**NOTE**: We just put the `bmi_b` variable in the phenotype file, however, we
-could have put all the variables of interest for multi-trait analysis since
-`regenie` supports it.
-
-## 2.2.2 Execute REGENIE with the toy dataset
-
-Step 0: exclude monomorphic and low variance SNPs from the toy dataset as they
-cause `regenie` to crash. Generally, QC **must** be performed prior to running
-`regenie`:
+### Step 0: Exclude monomorphic and low variance SNPs from the toy dataset as 
+they can cause serious bias
 
 ```bash
 plink \
@@ -1522,52 +1449,6 @@ plink \
   --make-bed \
   --maf 0.01
 ```
-
-Step 1:
-
-```bash
-regenie \
-  --step 1 \
-  --bed toyf \
-  --covarFile toy_regenie_covariates.txt \
-  --phenoFile toy_regenie_phenotype.txt \
-  --bsize 100 \
-  --out fit_bmi_out
-```
-
-Step 2:
-
-```bash
-regenie \
-  --step 2 \
-  --bed toyf \
-  --covarFile toy_regenie_covariates.txt \
-  --phenoFile toy_regenie_phenotype.txt \
-  --bsize 200 \
-  --pThresh 0.05 \
-  --pred fit_bmi_out_pred.list \
-  --ignore-pred \
-  --out test_bmi_out_firth
-```
-
-The summary statistics are in `test_bmi_out_firth_bmi.regenie`.
-
-**NOTE**: 
-
-We used `--ignore-pred` here because our sample for Step 1 is too small to 
-produce whole genome predictions required by `regenie`. It should **not** be the
-case with real data.
-
-## 2.3 Analysis with GCTA
-
-## 2.3.1 Preparation of the Genetic Relationships Matrix (GRM)
-
-The GRM is a prerequisite for using GCTA and can be constructed with the GCTA
-software taking into account sample relatedness as calculated with the KING
-software. We assume the toy dataset provided by HUA. If related individuals
-have been removed based on KING or PLINK IBD, then Step 1 below can be 
-excluded by also removing the `--keep individuals_unrelated.txt` PLINK argument
-in Step 2.
 
 ### Step 1: Find related individuals with KING
 
@@ -1623,7 +1504,7 @@ gcta64 \
   --out toyf_grm_sparse
 ```
 
-## 2.3.2 Preparation of covariate and phenotype files
+## 2.2.2 Preparation of covariate and phenotype files
 
 The covariate files should include covariates for each analysis mentioned above
 plus the PCs. Based on the accompanying toy dataset from HUA, we provide an
@@ -1710,7 +1591,7 @@ Rscript \
   }'
 ```
 
-## 2.3.3 Execute GCTA fastGWA with the toy dataset
+## 2.2.3 Execute GCTA fastGWA with the toy dataset
 
 Step 1: Create the null model using pruned SNPs with GCTA
 
@@ -1763,6 +1644,175 @@ done
 
 The summary statistics for each chromosome would then be in
 `fit_gcta_bmi_out_chr*.fastGWA`.
+
+## 3.3.4 GCTA fastGWA execution summary
+
+For more clarity, we cite all the aforementioned steps in the following stepwise
+manner which can be used for execution:
+
+0. Exclude monomorphic sites
+
+```bash
+plink \
+  --bfile toy \
+  --out toyf \
+  --make-bed \
+  --maf 0.01
+```
+
+1. Find related individuals with KING
+
+```bash
+king \
+  -b toyf.bed \
+  --unrelated \
+  --degree 2 \
+  --prefix individuals_
+```
+
+2. Conduct LD-pruning excluding related samples in preparation for GRM
+
+```bash
+plink \
+  --bfile toyf \
+  --keep individuals_unrelated.txt \
+  --indep 50 5 2 \
+  --out toyf_pruned
+```
+
+3. Create PLINK files with the pruned variants and all samples to be used for
+GRM estimation
+
+```bash
+plink \
+  --bfile toyf \
+  --extract toyf_pruned.prune.in \
+  --out toyf_for_grm \
+  --make-bed
+```
+
+4. Create GRM and GRM sparse matrices with the above PLINK files
+
+4.1 GRM matrix
+
+```bash
+gcta64 \
+  --bfile toyf_for_grm \
+  --make-grm \
+  --autosome \
+  --thread-num 4 \
+  --out toyf_grm
+```
+
+4.2 GRM sparse matrix
+
+```bash
+gcta64 \
+  --grm toyf_grm \
+  --make-bK-sparse 0.05 \
+  --out toyf_grm_sparse
+```
+
+
+5. Covariate and phenotypic files
+`toy.eigenvec` is not valid here! Use PC projections!
+
+```r
+Rscript \
+  -e '{
+    # Read all phenotypes
+    phen <- read.delim("toy.txt")
+    rownames(phen) <- phen$iid
+    phen$age2 <- phen$age^2
+    
+    # Construct 1st part of quantitative covariates files
+    qcovs <- data.frame(
+      FID=phen$fid,
+      IID=phen$iid,
+      age=phen$age,
+      age2=phen$age2
+    )
+    
+    # 2nd part - PCs
+    pcs <- read.table("toy.eigenvec",header=TRUE)
+    rownames(pcs) <- pcs$IID
+    pcs <- pcs[rownames(phen),]
+    pcs <- pcs[,grep("PC",colnames(pcs))]
+    qcovs <- cbind(qcovs,pcs)
+    
+    # Write the quantitative covariates file
+    write.table(qcovs,file="toy_gcta_q_covariates.txt",row.names=FALSE,
+        quote=FALSE)
+    
+    # Construct the categorical covariates files
+    ccovs <- data.frame(
+      FID=phen$fid,
+      IID=phen$iid,
+      sex=phen$sex
+    )
+    
+    # Write the categorical covariates file
+    write.table(ccovs,file="toy_gcta_c_covariates.txt",row.names=FALSE,
+        quote=FALSE)
+    
+    # Construct the phenotype file
+    resp <- data.frame(
+      FID=phen$fid,
+      IID=phen$iid,
+      bmi=phen$bmi_b
+    )
+    write.table(resp,file="toy_gcta_phenotype.txt",row.names=FALSE,
+        quote=FALSE)
+  }'
+```
+
+6. Prune SNPs using the total dataset (not the dataset with excluded samples
+created in Step 3) to use the output for null model estimation
+
+```bash
+plink \
+  --bfile toyf \
+  --out toyf_pruned_all \
+  --indep-pairwise 50 5 0.2
+```
+
+7. Create PLINK files to be used for the null model estimation (these need to
+have pruned variants for robustness)
+
+```bash
+plink \
+  --bfile toyf \
+  --out toy_null \
+  --exclude toyf_pruned_all.prune.out \
+  --make-bed
+```
+
+8. Create the null model using pruned SNPs with GCTA
+
+```bash
+gcta64 \
+  --bfile toy_null \
+  --grm-sparse toyf_grm_sparse \
+  --est-vg HE \
+  --pheno toy_gcta_phenotype.txt \
+  --qcovar toy_gcta_q_covariates.txt \
+  --covar toy_gcta_c_covariates.txt \
+  --fastGWA-mlm \
+  --model-only \
+  --thread-num 4 \
+  --out fit_gcta_bmi
+```
+
+9. Perform final GWAS by also using the null model with GCTA
+
+```bash
+gcta64 \
+  --bfile toyf \
+  --load-model fit_gcta_bmi.fastGWA \
+  --out fit_gcta_bmi_out \
+  --thread-num 4
+```
+
 
 ## Notes
 
