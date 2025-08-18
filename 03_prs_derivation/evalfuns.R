@@ -382,32 +382,103 @@ cmclapply <- function(...,rc) {
   ))
 }
 
-# Test
-prsFile <- "/media/storage3/playground/b4uprs/work/PRS/baseline/b4u_tgp_sbrc_prs.prs"
-prsFile <- "/media/storage3/playground/b4uprs/work/PRS/baseline/b4u_ukb_sbrc_prs.prs"
-prsFile <- "/media/storage3/playground/b4uprs/work/PRS/baseline/b4u_tgp_gctb.snpRes.prs"
-prsFile <- "/media/storage3/playground/b4uprs/work/PRS/baseline/b4u_ukb_gctb.snpRes.prs"
+################################################################################
 
-prsFile = "/media/storage3/playground/b4uprs/work/test/b4u_tgp_prscs_pst_eff_a1_b0.5_phiauto.txt"
+## ------------------------------------------------------------
+## Lambda-by-CI + Gaussian-perturbed betas (summary-statistics)
+## ------------------------------------------------------------
 
-covFile <- "/media/storage3/playground/b4uprs/work/HUABB/huabb/HUA_covariates.txt"
-trait <- "bmi"
-genoBase <- "/media/storage3/playground/b4uprs/work/HUABB/HUA_unrelated_dbsnp"
-iidCol <- 2
-sum <- TRUE
-center <- FALSE
-plink <- Sys.which("plink")
+# Solve for lambda so that P(|epsilon| < z * SE) = targetProb where 
+# epsilon ~ N(0, lambda * SE^2).
+# By rescaling, Z = epsilon/SE ~ N(0, lambda), so:
+#   P(|Z| < z) = targetProb
+# i.e. Φ(z / sqrt(lambda)) - Φ(-z / sqrt(lambda)) = targetProb.
+findLambda <- function(targetProb=0.95,zLimit=1.96,lower=1e-4,upper=100) {
+    stopifnot(targetProb > 0 && targetProb < 1,zLimit > 0)
+    
+    f <- function(lambda) {
+        pnorm(zLimit/sqrt(lambda)) - pnorm(-zLimit/sqrt(lambda)) - targetProb
+    }
+    
+    return(uniroot(f,lower=lower,upper=upper)$root)
+}
 
-# Grid search flow
-# 1. Sanitize PRS
-#sanFile <- sanitizePrs(prsFile,genoBase)
-# 2. Grid search (absolute values of beta)
-#obj <- gridSearch(prsFile=sanFile,covFile=covFile,trait=trait,genoBase=genoBase)
-#pip <- c(0,0.001,0.005,0.01,0.05,0.1,0.2,0.3,0.4)
-#beta <- c(0,1e-10,1e-9,1e-8,1e-7,1e-6,1e-5,1e-4,1e-3)
+# Generate perturbed betas:
+# betas_tilde = betas + Normal(0, sqrt(lambda) * SE)
+# Optionally draw multiple replicates (columns) for Monte Carlo / bootstraps.
+perturbBetas <- function(beta,SE,lambda,N=1,seed=NULL) {
+    stopifnot(length(beta)==length(SE),lambda>0,N>=1)
+    
+    if (!is.null(seed)) # Seed preferably to be set outside this function
+        set.seed(seed)
+    
+    n <- length(beta)
+    if (N == 1) {
+        return(beta + rnorm(n,mean=0,sd=sqrt(lambda)*SE))
+    } 
+    else {
+        # return an n x N matrix, each column is one perturbation
+        eps <- matrix(rnorm(n*N,0,1),nrow=n,ncol=N)
+        return(sweep(eps,1,sqrt(lambda)*SE,`*`) + beta)
+    }
+}
 
-# PRS coverage is 62.05% (786430 out of 1267425) SNPs
-# PRS coverage is 53.81% (3597528 out of 6685102) SNPs
-# PRS coverage is 61.48% (563258 out of 916199) SNPs
-# PRS coverage is 58.87% (2157515 out of 3664764) SNPs
-# GCTB runs not very good... why?
+## -------------------------
+## Example (drop-in usage)
+## -------------------------
+
+# Suppose you have vectors 'beta' and 'SE' from your meta-analysis:
+# beta <- gwas$beta
+# SE   <- gwas$se
+
+# 1) Get lambda such that ~95% of perturbations fall inside the 95% CI
+#lambda_ci95 <- findLambda(targetProb=0.95,zLimit=1.96)
+#cat("Lambda (target_prob=0.95, z=1.96):", lambda_ci95, "\n")
+# Note: for 95% within 95% CI, lambda will be ~1.0.
+
+# 2) Create one perturbed beta vector
+# perturbed <- perturbBetas(beta,SE,lambda=lambda_ci95,seed=123)
+
+# 3) Or create multiple perturbed draws (e.g., 100)
+# perturbed_mat <- perturb_betas(beta, SE, lambda = lambda_ci95,
+#                                n_draws = 100, seed = 123)
+# Each column of 'perturbed_mat' is one perturbed beta set.
+
+## -------------------------
+## Optional sanity check
+## -------------------------
+# # Proportion of a single draw that stays within the original 95% CI:
+# ci_low  <- beta - 1.96 * SE
+# ci_high <- beta + 1.96 * SE
+# in_CI   <- perturbed >= ci_low & perturbed <= ci_high
+# mean(in_CI)  # should be close to ~0.95 on average across many runs
+
+#~ # Test
+#~ prsFile <- "/media/storage3/playground/b4uprs/work/PRS/baseline/b4u_tgp_sbrc_prs.prs"
+#~ prsFile <- "/media/storage3/playground/b4uprs/work/PRS/baseline/b4u_ukb_sbrc_prs.prs"
+#~ prsFile <- "/media/storage3/playground/b4uprs/work/PRS/baseline/b4u_tgp_gctb.snpRes.prs"
+#~ prsFile <- "/media/storage3/playground/b4uprs/work/PRS/baseline/b4u_ukb_gctb.snpRes.prs"
+
+#~ prsFile = "/media/storage3/playground/b4uprs/work/test/b4u_tgp_prscs_pst_eff_a1_b0.5_phiauto.txt"
+
+#~ covFile <- "/media/storage3/playground/b4uprs/work/HUABB/huabb/HUA_covariates.txt"
+#~ trait <- "bmi"
+#~ genoBase <- "/media/storage3/playground/b4uprs/work/HUABB/HUA_unrelated_dbsnp"
+#~ iidCol <- 2
+#~ sum <- TRUE
+#~ center <- FALSE
+#~ plink <- Sys.which("plink")
+
+#~ # Grid search flow
+#~ # 1. Sanitize PRS
+#~ #sanFile <- sanitizePrs(prsFile,genoBase)
+#~ # 2. Grid search (absolute values of beta)
+#~ #obj <- gridSearch(prsFile=sanFile,covFile=covFile,trait=trait,genoBase=genoBase)
+#~ #pip <- c(0,0.001,0.005,0.01,0.05,0.1,0.2,0.3,0.4)
+#~ #beta <- c(0,1e-10,1e-9,1e-8,1e-7,1e-6,1e-5,1e-4,1e-3)
+
+#~ # PRS coverage is 62.05% (786430 out of 1267425) SNPs
+#~ # PRS coverage is 53.81% (3597528 out of 6685102) SNPs
+#~ # PRS coverage is 61.48% (563258 out of 916199) SNPs
+#~ # PRS coverage is 58.87% (2157515 out of 3664764) SNPs
+#~ # GCTB runs not very good... why?

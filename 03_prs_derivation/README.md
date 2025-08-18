@@ -347,15 +347,75 @@ rm -r $WORKSPACE/resources/EUR_LD/*.log $WORKSPACE/resources/EUR_LD/*.full.bin \
 
 # PRS processes
 
-Baseline PRS derivation + bootstrap
+The following describe the derivation and evaluation process for baseline PRS 
+for BMI and weight/BMI change derivation. Bootstrapping stabilization will be
+performed only for the best baseline PRS.
 
-## Baseline PRS derivation with SBayesRC
-
-### Data preparation
+## Baseline PRS derivation with SBayesRC and PRS-CS
 
 We assume that we have one file of METAL derived summary statistics for each 
 chromosome called `metal.chrZ.txt` with Z between 1 and 22. These are stored in
-`$WORKSPACE/work/METAL`
+`$WORKSPACE/work/METAL`. 
+
+### Data preparation
+
+Based on the [README](https://docs.google.com/document/d/1wolKXW5SfeNL4RtxCfcGj6JmC992r2cJ8b_Vw4ge2OE/edit?usp=drive_link) 
+of the METAL analysis performed by Anders Eriksson, there were several data
+transformations which require further pre-processing prior to running any of the
+tools for PRS derivation. It is stated that:
+
+>GWAS summary statistics files were harmonised with respect to reference and alternate allele, so that effect allele is the alternate allele.
+>SNPs were subset to MTAG SNPs for downstream multi-trait analyses.
+>METAL analyses was carried out to combine summary statistics from the different BETTER4U partners.
+>First, P values were adjusted for inflation (fitting a second degree polynomial of expected vs. observed P values for P > 0.01 and using the linear component to scale P values). Second, meta-analyses were carried out using (inverse variance weighted) METAL: new Z values were calculated using inverse transform of the adjusted P-values and the sign of the effect size. Z scores were combined using the sample size as weights.
+
+Therefore:
+
+* p-values were adjusted for inflation before meta-analysis
+* Then, Z were recomputed from those adjusted p-values, keeping the sign of the 
+effect.
+* METAL was run in a sample-size weighted mode, not truly inverse-variance
+* The `SE` column is a pseudo-SE and can be negative, because it’s not really a 
+standard error at all.
+
+As a result of the points above, betas and SEs must be reconstructed from Z, N
+and AF. The reconstructed betas and SEs will reflect **standardized phenotype**
+scales (inerpretation per SD unit of the phenotype per additional ALT allele) 
+which is inline with how GCTA `--fastGWA` works internally and also how PRS 
+tools expect effects (per allele and not per standardized genotype). 
+
+Specfically, the following conversions are made, assuming an additive model and 
+small per-SNP R<sup>2</sup>, with genotypes coded 0/1/2 and effect allele=ALT,
+let:
+
+$$
+\text{Var}(G)=2\,f\,(1-f), \quad f=\text{ALT allele frequency (AF)}, \quad N=\text{per-SNP (effective) sample size}.
+$$
+
+then
+
+$$
+SE \;\approx\; \frac{1}{\sqrt{N\,\text{Var}(G)}} \quad\text{and}\quad
+\hat\beta \;\approx\; \frac{Z}{\sqrt{N\,\text{Var}(G)}} \;=\; Z \cdot SE .
+$$
+
+These betas are interpreted as per-SD change in phenotype per 1-SD change in 
+genotype. To reflect per-SD change in phenotype per additional allele we remove
+the genotype standardization (as also per SBayesRC authors 
+[suggestion](https://github.com/zhilizheng/SBayesRC/issues/25#issuecomment-2138152126)):
+
+$$
+\hat\beta \;=\; \frac{Z \cdot SE}{\sqrt{2f(1-f)}}.
+$$
+
+and
+
+$$
+SE \;=\; \frac{SE}{\sqrt{2f(1-f)}}.
+$$
+
+The file conversions below take into account the aforementioned assumptions and
+observations (indeed there are a lot of negative SEs in the data).
 
 ### Conversion of METAL to COJO
 
@@ -381,28 +441,42 @@ and then, write COJO format for each chromosome and genome-wide:
 ```r
 Rscript \
   -e '{
+    # Intialize output list
     cojoList <- vector("list",22)
+    
+    # Read files
     for (chr in seq(1,22)) {
+        # METAL output filename
         mf <- paste0("metal.chr",chr,".txt")
+        
         message("Reading ",mf)
         mstats <- read.delim(mf)
+        
+        # Intermediate variables
+        # Genotype variance (for allele frequencyf=AF)
+        varG <- 2 * mstats$AF * (1 - mstats$AF)
+        # Denominator sqrt(N*varG)
+        den <- sqrt(mstats$N * mstats$varG)
+        # Standardized scale (per-SD phenotype, per-SD genotype)
+        SE_sd <- 1/den
+        BETA_sd <- mstats$Z * SE_sd
+        
+        # Assemble and write COJO file per chromosome
         cojoList[[chr]] <- data.frame(
             SNP=mstats$SNP,
-            #A1=mstats$REF,
-            #A2=mstats$ALT,
             A1=mstats$ALT,
             A2=mstats$REF,
             freq=mstats$AF,
-            b=mstats$Z*mstats$SE,
-            #b=mstats$Z*mstats$SE / sqrt(2*mstats$AF*(1 - mstats$AF)),
-            se=mstats$SE,
-            #se=mstats$SE / sqrt( 2 * mstats$AF * (1 - mstats$AF)),
+            b=BETA_sd/sqrt(varG),
+            se=SE_sd/sqrt(varG),
             p=10^-mstats$log10_P,
             N=round(mstats$N)
         )
         write.table(cojoList[[chr]],file=paste0("metal_b4u_chr",chr,".ma"),
             sep="\t",quote=FALSE,row.names=FALSE)
     }
+    
+    # All chromosomes
     cojos <- do.call("rbind",cojoList)
     write.table(cojos,file="metal_b4u.ma",sep="\t",quote=FALSE,row.names=FALSE)
   }'
@@ -752,7 +826,7 @@ nohup gctb \
 
 ### Conversion of METAL to PRS-CS expected format
 
-PRS-CSx works with the following summary statistics format:
+PRS-CS(x) works with the following summary statistics format:
 
 ```
 METAL format
@@ -762,35 +836,54 @@ PRS-CSx format
 SNP          A1   A2   BETA      SE
 ```
 
-The following R script will produce PRS-CSx versions of the METAL output:
+The following R script will produce PRS-CSx versions of the METAL output. The
+same assumptions regarding METAL output and betas, SEs as in the case of 
+SBayesRC COJO files apply:
 
 ```bash
 cd $WORKSPACE/work/METAL
 ```
 
-and then, write PRS-CSx format for each chromosome and genome-wide:
+and then, write PRS-CS(x) format for each chromosome and genome-wide:
 
 ```r
 Rscript \
   -e '{
+    # Intialize output list
     prscxList <- vector("list",22)
+    
+    # Read files and convert
     for (chr in seq(1,22)) {
+        # METAL output filename
         mf <- paste0("metal.chr",chr,".txt")
+        
         message("Reading ",mf)
         mstats <- read.delim(mf)
+        
+        # Intermediate variables
+        # Genotype variance (for allele frequencyf=AF)
+        varG <- 2 * mstats$AF * (1 - mstats$AF)
+        # Denominator sqrt(N*varG)
+        den <- sqrt(mstats$N * mstats$varG)
+        # Standardized scale (per-SD phenotype, per-SD genotype)
+        SE_sd <- 1/den
+        BETA_sd <- mstats$Z * SE_sd
+        
+        # Assemble and write PRS-CS files per chromosome
         prscxList[[chr]] <- data.frame(
             SNP=mstats$SNP,
             A1=mstats$ALT,
             A2=mstats$REF,
-            BETA=mstats$Z*mstats$SE,
-            SE=mstats$SE,
-            #se=mstats$SE / sqrt( 2 * mstats$AF * (1 - mstats$AF)),
+            BETA=BETA_sd/sqrt(varG),
+            SE=SE_sd/sqrt(varG),
             p=10^-mstats$log10_P,
             N=round(mstats$N)
         )
         write.table(prscxList[[chr]],file=paste0("metal_b4u_chr",chr,".csx"),
             sep="\t",quote=FALSE,row.names=FALSE)
     }
+    
+    # All chromosomes
     prscxs <- do.call("rbind",prscxList)
     write.table(prscxs,file="metal_b4u.csx",sep="\t",quote=FALSE,
         row.names=FALSE)
@@ -894,7 +987,7 @@ awk 'NR==1 { print "SNP\tA1\tBETA\tSE\tPIP" }
   $WORKSPACE/work/PRS/baseline/b4u_ukb_gctb.snpRes.prs
 ```
 
-### Baseline PRS evaluation with SBayesRC
+### Baseline PRS evaluation for both SBayesRC and PRS-CS
 
 We developed a small R library to sanitize (allele flipping etc.) and evaluate 
 the derived PRS based on simple metrics such as:
@@ -1025,11 +1118,136 @@ obj <- gridSearch(prsFile=sanFile,covFile=covFile,trait=trait,genoBase=genoBase,
 #  abs(BETA) > 1e-06
 #  PIP > 0
 # i = 6, j = 1
+```
 
+Based on the aforementioned evaluations, it seems that PRS-CS is the choice to
+go for BMI (and subsequently weight/BMI change).
+
+## PRS bootstrapping with PRS-CS
+
+### Theoretical framework
+
+We have SNP effects from meta-analyzed summary statistics from all the BETTER4U 
+cohosrts. We seek to add Gaussian noise to the beta effects such that the 
+resulting betas fall within their 95% estimated confidence interval.
+
+We have:
+
+* $\hat{\beta}_j$ : estimated effect size for SNP<sub>j</sub>
+* $SE_j$ : standard error of $\hat{\beta}_j$
+
+Then the 95% confidence interval for $\hat{\beta}_j$ is:
+
+$$
+\left[ \hat{\beta}_j - 1.96 \cdot SE_j,\ \hat{\beta}_j + 1.96 \cdot SE_j \right]
+$$
+
+We add Gaussian noise to simulate perturbation:
+
+$$
+\tilde{\beta}_j = \hat{\beta}_j + \epsilon_j,\quad \text{where } \epsilon_j \sim \mathcal{N}(0, \lambda \cdot SE_j^2)
+$$
+
+Now, we want to estimate the probability the perturbed beta stays in the 95% CI.
+We want:
+
+$$
+P\left( \tilde{\beta}_j \in [\hat{\beta}_j \pm 1.96 \cdot SE_j] \right) = P\left( |\epsilon_j| < 1.96 \cdot SE_j \right) = 0.95
+$$
+
+With error rescaling:
+
+$$
+Z_j = \frac{\epsilon_j}{SE_j} \sim \mathcal{N}(0, \lambda)
+$$
+
+the inequality becomes:
+
+$$
+P(|Z_j| < 1.96) = 0.95
+$$
+
+We are now solving for λ and looking for the value of λ such that:
+
+$$
+P(|Z| < 1.96) = 0.95 \quad \text{where } Z \sim \mathcal{N}(0, \lambda)
+$$
+
+If Z were from a **standard normal** $\mathcal{N}(0,1)$, this would be true by 
+definition. But here the **variance** is λ, so the tails are fatter (for λ > 1) 
+or thinner (for λ < 1).
+
+So we solve:
+
+$$
+\Phi\left( \frac{1.96}{\sqrt{\lambda}} \right) - \Phi\left( -\frac{1.96}{\sqrt{\lambda}} \right) = 0.95
+$$
+
+This is the cumulative probability from −1.96 to +1.96 under a normal 
+distribution with variance λ. If we solve the equation numerically, we get:
+
+$$
+\lambda \approx 1.0
+$$
+
+This makes intuitive sense because if the perturbation variance equals the 
+original SE<sup>2</sup> (i.e. λ = 1), then:
+
+$$
+\epsilon_j \sim \mathcal{N}(0, SE_j^2)
+\Rightarrow Z_j = \epsilon_j / SE_j \sim \mathcal{N}(0, 1)
+\Rightarrow P(|Z_j| < 1.96) \approx 0.95
+$$
+
+So, **λ = 1** means we are adding noise of the same scale as the uncertainty in 
+the original beta estimates.
+
+### Generation of perturbed summary statistics
+
+The file `$WORKSPACE/work/METAL/metal_b4u.csx` contains the meta-analysis
+summary statistics in PRS-CS format. We will use betas and SEs in this file to
+generate pertrurbed summary statistics. The following script will introduce 
+noise in betas within the acceptable CIs. The process will be repeated 1000
+times to generate 1000 perturbed datasets.
+
+```
+source("evalfuns.R")
+
+WORKSPACE <- Sys.getenv("WORKSPACE")
+
+# Read in summary statistics
+gwas <- read.delim(file.path(WORKSPACE,"work","METAL","metal_b4u.csx"))
 
 
 ```
 
+
+The following script will execute PRS-CS 1000 times
+
+PRS-CS runs in a single step. It may take some time to complete, so it's better
+to use `nohup`:
+
+```bash
+# --n_gwas can be the median METAL sample size
+nohup python $WORKSPACE/resources/PRScs/PRScs.py \
+  --ref_dir=$WORKSPACE/resources/PRScsxLD/ldblk_1kg_eur \
+  --bim_prefix=$WORKSPACE/work/HUABB/only_bim/HUA_unrelated_dbsnp \
+  --sst_file=$WORKSPACE/work/METAL/metal_b4u.csx \
+  --n_gwas=232593 \
+  --out_dir=$WORKSPACE/work/PRS/baseline/b4u_tgp_prscs \
+  > $WORKSPACE/work/PRS/baseline/b4u_tgp_prscs.log 2>&1 &
+# 2614263
+```
+
+Then simply concatenate the per chromosome results:
+
+```bash
+cd $WORKSPACE/work/PRS/baseline
+for i in {1..22}; 
+do
+  cat b4u_tgp_prscs_pst_eff_a1_b0.5_phiauto_chr${i}.txt
+done > b4u_tgp_prscs_pst_eff_a1_b0.5_phiauto.txt
+```
 
 
 #### Notes
@@ -1202,13 +1420,52 @@ plink \
 
 ```bash
 python PRScsx.py \
-  --ref_dir=/media/storage3/playground/b4uprs/resources/PRScsxLD \
-  --bim_prefix=/media/storage3/playground/b4uprs/work/HUABB/only_bim/HUA_unrelated_dbsnp \
-  --sst_file=/media/storage3/playground/b4uprs/work/METAL/metal_b4u.csx \
+  --ref_dir=$WORKSPACE/resources/PRScsxLD \
+  --bim_prefix=$WORKSPACE/work/HUABB/only_bim/HUA_unrelated_dbsnp \
+  --sst_file=$WORKSPACE/work/METAL/metal_b4u.csx \
   --n_gwas=230146 \
   --pop=EUR \
-  --out_dir=b4u_tgp_prscs \
-  --out_name=test
+  --out_dir=$WORKSPACE/work/PRS/baseline/b4u_tgp_prscs \
+  --out_name=b4u_tgp_prscs
 ```
 
-nohup python ../../resources/PRScs/PRScs.py --ref_dir=/media/storage3/playground/b4uprs/resources/PRScsxLD/ldblk_1kg_eur --bim_prefix=/media/storage3/playground/b4uprs/work/HUABB/only_bim/HUA_unrelated_dbsnp --sst_file=/media/storage3/playground/b4uprs/work/METAL/metal_b4u.csx --n_gwas=230146 --out_dir=b4u_tgp_prscs &
+```bash
+nohup python $WORKSPACE/resources/PRScs/PRScs.py \
+ --ref_dir=$WORKSPACE/resources/PRScsxLD/ldblk_1kg_eur \
+ --bim_prefix=$WORKSPACE/work/HUABB/only_bim/HUA_unrelated_dbsnp \
+ --sst_file=$WORKSPACE/work/METAL/metal_b4u.csx \
+ --n_gwas=230146 \
+ --out_dir=b4u_tgp_prscs &
+```
+
+10. Initial COJO creation prior to re-examination of METAL output
+
+```r
+Rscript \
+  -e '{
+    cojoList <- vector("list",22)
+    for (chr in seq(1,22)) {
+        mf <- paste0("metal.chr",chr,".txt")
+        message("Reading ",mf)
+        mstats <- read.delim(mf)
+        cojoList[[chr]] <- data.frame(
+            SNP=mstats$SNP,
+            #A1=mstats$REF,
+            #A2=mstats$ALT,
+            A1=mstats$ALT,
+            A2=mstats$REF,
+            freq=mstats$AF,
+            b=mstats$Z*mstats$SE,
+            #b=mstats$Z*mstats$SE / sqrt(2*mstats$AF*(1 - mstats$AF)),
+            se=mstats$SE,
+            #se=mstats$SE / sqrt( 2 * mstats$AF * (1 - mstats$AF)),
+            p=10^-mstats$log10_P,
+            N=round(mstats$N)
+        )
+        write.table(cojoList[[chr]],file=paste0("metal_b4u_chr",chr,".ma"),
+            sep="\t",quote=FALSE,row.names=FALSE)
+    }
+    cojos <- do.call("rbind",cojoList)
+    write.table(cojos,file="metal_b4u.ma",sep="\t",quote=FALSE,row.names=FALSE)
+  }'
+```
