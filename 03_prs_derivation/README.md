@@ -389,14 +389,14 @@ small per-SNP R<sup>2</sup>, with genotypes coded 0/1/2 and effect allele=ALT,
 let:
 
 $$
-\text{Var}(G)=2\,f\,(1-f), \quad f=\text{ALT allele frequency (AF)}, \quad N=\text{per-SNP (effective) sample size}.
+\text{Var}(G)=2f(1-f), \quad f=\text{ALT allele frequency (AF)}, \quad N=\text{per-SNP (effective) sample size}
 $$
 
 then
 
 $$
-SE \;\approx\; \frac{1}{\sqrt{N\,\text{Var}(G)}} \quad\text{and}\quad
-\hat\beta \;\approx\; \frac{Z}{\sqrt{N\,\text{Var}(G)}} \;=\; Z \cdot SE .
+SE \approx\ \frac{1}{\sqrt{N\text{Var}(G)}} \quad\text{and}\quad
+\hat\beta \approx \frac{Z}{\sqrt{N\text{Var}(G)}} = Z \cdot SE
 $$
 
 These betas are interpreted as per-SD change in phenotype per 1-SD change in 
@@ -405,13 +405,13 @@ the genotype standardization (as also per SBayesRC authors
 [suggestion](https://github.com/zhilizheng/SBayesRC/issues/25#issuecomment-2138152126)):
 
 $$
-\hat\beta \;=\; \frac{Z \cdot SE}{\sqrt{2f(1-f)}}.
+\hat\beta = \frac{Z \cdot SE}{\sqrt{2f(1-f)}}.
 $$
 
 and
 
 $$
-SE \;=\; \frac{SE}{\sqrt{2f(1-f)}}.
+SE = \frac{SE}{\sqrt{2f(1-f)}}.
 $$
 
 The file conversions below take into account the aforementioned assumptions and
