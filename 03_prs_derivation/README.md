@@ -405,13 +405,13 @@ the genotype standardization (as also per SBayesRC authors
 [suggestion](https://github.com/zhilizheng/SBayesRC/issues/25#issuecomment-2138152126)):
 
 $$
-\hat\beta = \frac{Z \cdot SE}{\sqrt{2f(1-f)}}.
+\hat\beta = \frac{Z \cdot SE}{\sqrt{2f(1-f)}}
 $$
 
 and
 
 $$
-SE = \frac{SE}{\sqrt{2f(1-f)}}.
+SE = \frac{SE}{\sqrt{2f(1-f)}}
 $$
 
 The file conversions below take into account the aforementioned assumptions and
@@ -456,7 +456,7 @@ Rscript \
         # Genotype variance (for allele frequencyf=AF)
         varG <- 2 * mstats$AF * (1 - mstats$AF)
         # Denominator sqrt(N*varG)
-        den <- sqrt(mstats$N * mstats$varG)
+        den <- sqrt(mstats$N * varG)
         # Standardized scale (per-SD phenotype, per-SD genotype)
         SE_sd <- 1/den
         BETA_sd <- mstats$Z * SE_sd
@@ -574,15 +574,11 @@ g <- ggplot(cojos,aes(x=N)) +
 ggsave(filename="size_all.png",plot=g)
 ```
 
-#### `rate2pq` thresholds
-
-TBD if required.
-
 ### Baseline PRS with R SBayesRC and 1000 genomes EUR population LD
 
 The nature of BETTER4U per cohort summary statistics causes non-uniform and 
 distant sample sizes as well as deviations from LD stability. Therefore, we run 
-the QC step of SBayesRC with more relaxed thresholds.
+the QC step of SBayesRC with more relaxed threshold regarding sample size.
 
 1. The QC and imputation steps can be done in one script as with 1000 genomes
 data, not much time is required:
@@ -610,9 +606,7 @@ Rscript \
         mafile=maFile,
         LDdir=ldFolder,
         output=output,
-        freq_thresh=0.3,
         N_sd_range=4,
-        rate2pq=0.8,
         log2file=TRUE
     )
 
@@ -662,7 +656,7 @@ imputation takes longer, so we run in the background with `nohup`.
 
 ```bash
 export OMP_NUM_THREADS=32
-export RC=0.25
+export RC=0.5
 
 nohup Rscript -e '
 {
@@ -682,9 +676,7 @@ nohup Rscript -e '
         mafile=maFile,
         LDdir=ldFolder,
         output=output,
-        freq_thresh=0.3,
         N_sd_range=4,
-        rate2pq=0.8,
         log2file=TRUE
     )
 
@@ -727,7 +719,8 @@ nohup Rscript -e '
 }
 ' > $WORKSPACE/work/PRS/baseline/b4u_ukb_sbrc_prs.log 2>&1 &
 ```
-
+2814047
+2814105
 ### Baseline PRS with GCTB and 1000 genomes EUR population LD
 
 The QC step in GCTB SBayesRC is fixed and uses only _N_.
@@ -864,7 +857,7 @@ Rscript \
         # Genotype variance (for allele frequencyf=AF)
         varG <- 2 * mstats$AF * (1 - mstats$AF)
         # Denominator sqrt(N*varG)
-        den <- sqrt(mstats$N * mstats$varG)
+        den <- sqrt(mstats$N * varG)
         # Standardized scale (per-SD phenotype, per-SD genotype)
         SE_sd <- 1/den
         BETA_sd <- mstats$Z * SE_sd
@@ -915,7 +908,7 @@ nohup python $WORKSPACE/resources/PRScs/PRScs.py \
   --n_gwas=232593 \
   --out_dir=$WORKSPACE/work/PRS/baseline/b4u_tgp_prscs \
   > $WORKSPACE/work/PRS/baseline/b4u_tgp_prscs.log 2>&1 &
-# 2614263
+# 2817564
 ```
 
 Then simply concatenate the per chromosome results:
@@ -1467,5 +1460,47 @@ Rscript \
     }
     cojos <- do.call("rbind",cojoList)
     write.table(cojos,file="metal_b4u.ma",sep="\t",quote=FALSE,row.names=FALSE)
+  }'
+```
+
+11. Initual SBayesRC running with wrong betas and relaxed thresholds
+
+```bash
+export OMP_NUM_THREADS=32
+export RC=0.25
+
+Rscript \
+  -e '{
+    library(SBayesRC)
+
+    #WORKSPACE <- $WORKSPACE
+    WORKSPACE <- Sys.getenv("WORKSPACE")
+    RC <- as.numeric(Sys.getenv("RC"))
+
+    maFile <- file.path(WORKSPACE,"work","METAL","metal_b4u.ma")
+    ldFolder <- file.path(WORKSPACE,"resources","EUR_LD")
+    annot <- file.path(WORKSPACE,"resources","annot_baseline2.2.txt")
+    outPrefix <- file.path(WORKSPACE,"work","PRS","baseline","b4u_tgp_sbrc")
+    output <- paste0(outPrefix,"_tidy.ma")
+
+    # QC
+    SBayesRC::tidy(
+        mafile=maFile,
+        LDdir=ldFolder,
+        output=output,
+        freq_thresh=0.3,
+        N_sd_range=4,
+        rate2pq=0.8,
+        log2file=TRUE
+    )
+
+    # Optional (not) imputation
+    SBayesRC::impute(
+        mafile=paste0(outPrefix,"_tidy.ma"),
+        LDdir=ldFolder,
+        output=paste0(outPrefix,"_imp.ma"),
+        log2file=TRUE,
+        rc=RC
+    )
   }'
 ```
