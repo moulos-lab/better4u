@@ -1015,9 +1015,10 @@ present in the system.
 The whole process is outlined in the R chunks below:
 
 ```r
-source("evalfuns.R")
-
 WORKSPACE <- Sys.getenv("WORKSPACE")
+
+source(file.path(WORKSPACE,"resources","better4u","03_prs_derivation",
+    "evalfuns.R"))
 
 # Genetic data file (HUABB)
 genoBase <- file.path(WORKSPACE,"work","HUABB","HUA_unrelated_dbsnp")
@@ -1031,17 +1032,18 @@ prsFile <- file.path(WORKSPACE,"work","PRS","baseline","b4u_tgp_sbrc_prs.prs")
 # Grid search flow
 # 1. Sanitize PRS
 sanFile <- sanitizePrs(prsFile,genoBase)
+#PRS coverage is 62.04% (785209 out of 1265592) SNPs
 
 # 2. Grid search (absolute values of beta)
 obj <- gridSearch(prsFile=sanFile,covFile=covFile,trait=trait,genoBase=genoBase,
     rc=0.2)
 #Best PRS according to prs_r2 found at:
-#  abs(BETA) > 1e-05
+#  abs(BETA) > 1e-07
 #  PIP > 0
-# i = 7, j = 1
+# i = 5, j = 1
 
 # 3. Plot results
-p <- gridSearchPlot(obj$metrics,"prs_r2",i=7,j=1)
+p <- gridSearchPlot(obj$metrics,"prs_r2",i=5,j=1)
 
 
 # R SBayesRC with built-in LD panel
@@ -1049,6 +1051,26 @@ prsFile <- file.path(WORKSPACE,"work","PRS","baseline","b4u_ukb_sbrc_prs.prs")
 
 # 1. Sanitize PRS
 sanFile <- sanitizePrs(prsFile,genoBase)
+#PRS coverage is 54.29% (3565917 out of 6567715) SNPs
+
+# 2. Grid search (absolute values of beta)
+obj <- gridSearch(prsFile=sanFile,covFile=covFile,trait=trait,genoBase=genoBase,
+    rc=0.2)
+#Best PRS according to prs_r2 found at:
+#  abs(BETA) > 1e-08
+#  PIP > 0
+# i = 4, j = 1
+
+# 3. Plot results
+p <- gridSearchPlot(obj$metrics,"prs_r2",i=4,j=1)
+
+
+# GCTB SBayesRC with 1000 genomes LD panel
+prsFile <- file.path(WORKSPACE,"work","PRS","baseline","b4u_tgp_gctb.snpRes.prs")
+
+# 1. Sanitize PRS
+sanFile <- sanitizePrs(prsFile,genoBase)
+#PRS coverage is 61.57% (581916 out of 945190) SNPs
 
 # 2. Grid search (absolute values of beta)
 obj <- gridSearch(prsFile=sanFile,covFile=covFile,trait=trait,genoBase=genoBase,
@@ -1062,40 +1084,23 @@ obj <- gridSearch(prsFile=sanFile,covFile=covFile,trait=trait,genoBase=genoBase,
 p <- gridSearchPlot(obj$metrics,"prs_r2",i=6,j=1)
 
 
-# GCTB SBayesRC with 1000 genomes LD panel
-prsFile <- file.path(WORKSPACE,"work","PRS","baseline","b4u_tgp_gctb.snpRes.prs")
-
-# 1. Sanitize PRS
-sanFile <- sanitizePrs(prsFile,genoBase)
-
-# 2. Grid search (absolute values of beta)
-obj <- gridSearch(prsFile=sanFile,covFile=covFile,trait=trait,genoBase=genoBase,
-    rc=0.2)
-#Best PRS according to prs_r2 found at:
-#  abs(BETA) > 1e-04
-#  PIP > 0.1
-# i = 8, j = 6
-
-# 3. Plot results
-p <- gridSearchPlot(obj$metrics,"prs_r2",i=8,j=6)
-
-
 # GCTB SBayesRC with built-in LD panel
 prsFile <- file.path(WORKSPACE,"work","PRS","baseline","b4u_ukb_gctb.snpRes.prs")
 
 # 1. Sanitize PRS
 sanFile <- sanitizePrs(prsFile,genoBase)
+#PRS coverage is 59.16% (2189379 out of 3700573) SNPs
 
 # 2. Grid search (absolute values of beta)
 obj <- gridSearch(prsFile=sanFile,covFile=covFile,trait=trait,genoBase=genoBase,
     rc=0.2)
 #Best PRS according to prs_r2 found at:
-#  abs(BETA) > 1e-05
-#  PIP > 0.01
-# i = 8, j = 6
+#  abs(BETA) > 1e-06
+#  PIP > 0.001
+# i = 6, j = 2
 
 # 3. Plot results
-p <- gridSearchPlot(obj$metrics,"prs_r2",i=8,j=6)
+p <- gridSearchPlot(obj$metrics,"prs_r2",i=6,j=2)
 
 
 # PRS-CS with built-in EUR 1000 genomes panel
