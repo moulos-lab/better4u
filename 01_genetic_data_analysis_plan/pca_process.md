@@ -375,7 +375,6 @@ done
 If we follow A. Eriksson process, step 5 below is **omitted**.
 
 ## 5. Remove any 1000 genomes variants not present in HRC imputed cohorts
-summary_impact_filter <- c("MODERATE","HIGH")
 
 We use the list of common SNPs derived above to intersect with 1000 genomes
 SNPs:

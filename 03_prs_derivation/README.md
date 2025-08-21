@@ -719,8 +719,7 @@ nohup Rscript -e '
 }
 ' > $WORKSPACE/work/PRS/baseline/b4u_ukb_sbrc_prs.log 2>&1 &
 ```
-2814047
-2814105
+
 ### Baseline PRS with GCTB and 1000 genomes EUR population LD
 
 The QC step in GCTB SBayesRC is fixed and uses only _N_.
@@ -843,7 +842,7 @@ and then, write PRS-CS(x) format for each chromosome and genome-wide:
 Rscript \
   -e '{
     # Intialize output list
-    prscxList <- vector("list",22)
+    prscxList <- bimList <- vector("list",22)
     
     # Read files and convert
     for (chr in seq(1,22)) {
@@ -874,12 +873,27 @@ Rscript \
         )
         write.table(prscxList[[chr]],file=paste0("metal_b4u_chr",chr,".csx"),
             sep="\t",quote=FALSE,row.names=FALSE)
+        
+        # Also a BIM right out of METAL output
+        bimList[[chr]] <- data.frame(
+            CHR=mstats$CHR,
+            ID=mstats$SNP,
+            CM=0,
+            POS=mstats$POS,
+            A1=mstats$ALT,
+            A2=mstats$REF
+        )
     }
     
     # All chromosomes
     prscxs <- do.call("rbind",prscxList)
     write.table(prscxs,file="metal_b4u.csx",sep="\t",quote=FALSE,
         row.names=FALSE)
+    
+    # BIM for PRS-CS
+    bims <- do.call("rbind",bimList)
+    write.table(bims,file="metal_b4u.bim",sep="\t",quote=FALSE,
+        row.names=FALSE,col.names=FALSE)
   }'
 ```
 
@@ -908,7 +922,6 @@ nohup python $WORKSPACE/resources/PRScs/PRScs.py \
   --n_gwas=232593 \
   --out_dir=$WORKSPACE/work/PRS/baseline/b4u_tgp_prscs \
   > $WORKSPACE/work/PRS/baseline/b4u_tgp_prscs.log 2>&1 &
-# 2817564
 ```
 
 Then simply concatenate the per chromosome results:
@@ -1108,6 +1121,7 @@ prsFile <- file.path(WORKSPACE,"work","PRS","baseline","b4u_tgp_prscs_pst_eff_a1
 
 # 1. Sanitize PRS
 sanFile <- sanitizePrs(prsFile,genoBase,from="prscs")
+# PRS coverage is 100% (684425 out of 684425) SNPs
 
 # 2. Grid search (absolute values of beta)
 obj <- gridSearch(prsFile=sanFile,covFile=covFile,trait=trait,genoBase=genoBase,
@@ -1116,6 +1130,9 @@ obj <- gridSearch(prsFile=sanFile,covFile=covFile,trait=trait,genoBase=genoBase,
 #  abs(BETA) > 1e-06
 #  PIP > 0
 # i = 6, j = 1
+
+# 3. Plot results
+p <- gridSearchPlot(obj$metrics,"prs_r2",i=6,j=1)
 ```
 
 Based on the aforementioned evaluations, it seems that PRS-CS is the choice to
@@ -1208,43 +1225,99 @@ generate pertrurbed summary statistics. The following script will introduce
 noise in betas within the acceptable CIs. The process will be repeated 1000
 times to generate 1000 perturbed datasets.
 
-```
-source("evalfuns.R")
-
+```r
 WORKSPACE <- Sys.getenv("WORKSPACE")
+
+source(file.path(WORKSPACE,"resources","better4u","03_prs_derivation",
+    "evalfuns.R"))
 
 # Read in summary statistics
 gwas <- read.delim(file.path(WORKSPACE,"work","METAL","metal_b4u.csx"))
 
+# betas and ses
+beta <- gwas$BETA
+SE   <- gwas$SE
 
+# Estimate λ for 95% CI
+lambda_ci95 <- findLambda(targetProb=0.95,zLimit=1.96)
+# Note: for 95% within 95% CI, lambda will be ~1.0.
+
+# Bootstrap 1000 times
+set.seed(42)
+#perturbed <- perturbBetas(beta,SE,lambda=lambda_ci95)
+perturbed <- perturbBetas(beta,SE,lambda=lambda_ci95,N=100)
+
+## Save the pertubed betas
+## save(perturbed,file=file.path(WORKSPACE,"work","PRS","baseline",
+##  "perturbed.rda"))
+
+# Create 1000 PRS-CS summary statistics files
+iterString <- sprintf("%04d", 1:1000)
+cmclapply(seq(ncol(perturbed)),function(j) {
+    message("Writing perturbed beta iteration ",j)
+    
+    # Prepare the data frame
+    tmpcs <- gwas
+    tmpcs$p <- NULL
+    tmpcs$BETA <- perturbed[,j]
+    
+    # Write it to the appropriate place
+    outPath <- file.path(WORKSPACE,"work","PRS","bootstrap",iterString[j])
+    dir.create(outPath,recursive=TRUE,showWarnings=FALSE)
+    write.table(tmpcs,file=file.path(outPath,"metal_b4u_sim.csx"),sep="\t",
+        quote=FALSE,row.names=FALSE)
+},rc=1)
 ```
 
+### Running PRS-CS with boostraped summary statistics
 
-The following script will execute PRS-CS 1000 times
-
-PRS-CS runs in a single step. It may take some time to complete, so it's better
-to use `nohup`:
-
-```bash
-# --n_gwas can be the median METAL sample size
-nohup python $WORKSPACE/resources/PRScs/PRScs.py \
-  --ref_dir=$WORKSPACE/resources/PRScsxLD/ldblk_1kg_eur \
-  --bim_prefix=$WORKSPACE/work/HUABB/only_bim/HUA_unrelated_dbsnp \
-  --sst_file=$WORKSPACE/work/METAL/metal_b4u.csx \
-  --n_gwas=232593 \
-  --out_dir=$WORKSPACE/work/PRS/baseline/b4u_tgp_prscs \
-  > $WORKSPACE/work/PRS/baseline/b4u_tgp_prscs.log 2>&1 &
-# 2614263
-```
-
-Then simply concatenate the per chromosome results:
+We are going to use GNU `parallel` for our purposes. Based on our setup, the
+following script will execute PRS-CS 1000 times. It should be put in a `.sh` 
+file, e.g. `run_prscx_bootstrap.sh`. The threads reflect the availability in our
+system (56 cores, ~480GB RAM). Each iteration uses 4 cores for MCMC and the
+bootstrap is executed in 14 concurrent jobs.
 
 ```bash
-cd $WORKSPACE/work/PRS/baseline
-for i in {1..22}; 
-do
-  cat b4u_tgp_prscs_pst_eff_a1_b0.5_phiauto_chr${i}.txt
-done > b4u_tgp_prscs_pst_eff_a1_b0.5_phiauto.txt
+#!/bin/bash
+
+# Allow job control
+set -m
+
+# Kill children on exit
+trap "echo 'Stopping...'; pkill -P $$" SIGINT SIGTERM EXIT
+
+export WORKSPACE=/media/storage3/playground/b4uprs
+
+N_THREADS=4
+
+export OMP_NUM_THREADS=$N_THREADS
+export OPENBLAS_NUM_THREADS=$N_THREADS
+export MKL_NUM_THREADS=$N_THREADS
+export NUMEXPR_NUM_THREADS=$N_THREADS
+
+JOBS=14
+
+# Run
+parallel -j ${JOBS} '
+  python $WORKSPACE/resources/PRScs/PRScs.py \
+    --ref_dir=$WORKSPACE/resources/PRScsxLD/ldblk_1kg_eur \
+    --bim_prefix=$WORKSPACE/work/HUABB/only_bim/HUA_unrelated_dbsnp \
+    --sst_file=$WORKSPACE/work/PRS/bootstrap/{}/metal_b4u_sim.csx \
+    --n_gwas=232593 \
+    --out_dir=$WORKSPACE/work/PRS/bootstrap/{}/b4u_tgp_prscs_sim \
+    > $WORKSPACE/work/PRS/bootstrap/{}/run.log 2>&1
+' ::: $(printf "%04d " {1..1000})
+
+# Wait for all PRS-CS runs to finish
+wait
+
+# Merge
+parallel -j ${JOBS} '
+  for CHR in $(seq 1 22); 
+  do
+    cat $WORKSPACE/work/PRS/bootstrap/{}/b4u_tgp_prscs_sim_pst_eff_a1_b0.5_phiauto_chr${$CHR}.txt
+  done > $WORKSPACE/work/PRS/bootstrap/{}/b4u_tgp_prscs_sim_pst_eff_a1_b0.5_phiauto.txt
+' ::: $(printf "%04d " {1..1000})
 ```
 
 
@@ -1508,4 +1581,26 @@ Rscript \
         rc=RC
     )
   }'
+```
+
+12. PRS-CS with all summary statistics SNPs
+
+```bash
+nohup python $WORKSPACE/resources/PRScs/PRScs.py \
+  --ref_dir=$WORKSPACE/resources/PRScsxLD/ldblk_1kg_eur \
+  --bim_prefix=$WORKSPACE/work/METAL/metal_b4u \
+  --sst_file=$WORKSPACE/work/METAL/metal_b4u.csx \
+  --n_gwas=232593 \
+  --out_dir=$WORKSPACE/work/PRS/baseline/b4u_tgp_prscs2 \
+  > $WORKSPACE/work/PRS/baseline/b4u_tgp_prscs2.log 2>&1 &
+```
+
+Then simply concatenate the per chromosome results:
+
+```bash
+cd $WORKSPACE/work/PRS/baseline
+for i in {1..22}; 
+do
+  cat b4u_tgp_prscs_pst_eff_a1_b0.5_phiauto_chr${i}.txt
+done > b4u_tgp_prscs_pst_eff_a1_b0.5_phiauto.txt
 ```
