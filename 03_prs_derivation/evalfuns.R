@@ -60,8 +60,8 @@ gridSearch <- function(pip=c(0,0.001,0.005,0.01,0.05,0.1,0.2,0.3,0.4),
     
     bestIndex <- .whichMaxLast(obj[,,metric,drop=FALSE])
     message("Best PRS according to ",metric," found at:")
-    message("  abs(BETA) > ",beta[bestIndex$ind[1]])
-    message("  PIP > ",pip[bestIndex$ind[2]])
+    message("  abs(BETA) > ",beta[bestIndex$ind[1]]," (i=",bestIndex$ind[1],")")
+    message("  PIP > ",pip[bestIndex$ind[2]]," (j=",bestIndex$ind[2],")")
     
     # Output some kind of matrix with metrics? R2? PRS R2? PRS p-value
     # Suitable for a heatmap?

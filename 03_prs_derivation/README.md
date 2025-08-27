@@ -1058,6 +1058,10 @@ obj <- gridSearch(prsFile=sanFile,covFile=covFile,trait=trait,genoBase=genoBase,
 # 3. Plot results
 p <- gridSearchPlot(obj$metrics,"prs_r2",i=5,j=1)
 
+# 4. Export the filtered file
+write.table(obj$prs,file.path(WORKSPACE,"work","PRS","baseline",
+    "b4u_tgp_sbrc_prs.bst"),sep="\t",quote=FALSE,row.names=FALSE)
+
 
 # R SBayesRC with built-in LD panel
 prsFile <- file.path(WORKSPACE,"work","PRS","baseline","b4u_ukb_sbrc_prs.prs")
@@ -1076,6 +1080,10 @@ obj <- gridSearch(prsFile=sanFile,covFile=covFile,trait=trait,genoBase=genoBase,
 
 # 3. Plot results
 p <- gridSearchPlot(obj$metrics,"prs_r2",i=4,j=1)
+
+# 4. Export the filtered file
+write.table(obj$prs,file.path(WORKSPACE,"work","PRS","baseline",
+    "b4u_ukb_sbrc_prs.bst"),sep="\t",quote=FALSE,row.names=FALSE)
 
 
 # GCTB SBayesRC with 1000 genomes LD panel
@@ -1096,6 +1104,10 @@ obj <- gridSearch(prsFile=sanFile,covFile=covFile,trait=trait,genoBase=genoBase,
 # 3. Plot results
 p <- gridSearchPlot(obj$metrics,"prs_r2",i=6,j=1)
 
+# 4. Export the filtered file
+write.table(obj$prs,file.path(WORKSPACE,"work","PRS","baseline",
+    "b4u_tgp_gctb.snpRes.bst"),sep="\t",quote=FALSE,row.names=FALSE)
+
 
 # GCTB SBayesRC with built-in LD panel
 prsFile <- file.path(WORKSPACE,"work","PRS","baseline","b4u_ukb_gctb.snpRes.prs")
@@ -1115,17 +1127,22 @@ obj <- gridSearch(prsFile=sanFile,covFile=covFile,trait=trait,genoBase=genoBase,
 # 3. Plot results
 p <- gridSearchPlot(obj$metrics,"prs_r2",i=6,j=2)
 
+# 4. Export the filtered file
+write.table(obj$prs,file.path(WORKSPACE,"work","PRS","baseline",
+    "b4u_ukb_gctb.snpRes.bst"),sep="\t",quote=FALSE,row.names=FALSE)
+
 
 # PRS-CS with built-in EUR 1000 genomes panel
-prsFile <- file.path(WORKSPACE,"work","PRS","baseline","b4u_tgp_prscs_pst_eff_a1_b0.5_phiauto.txt")
+prsFile <- file.path(WORKSPACE,"work","PRS","baseline",
+    "b4u_tgp_prscs_pst_eff_a1_b0.5_phiauto.txt")
 
 # 1. Sanitize PRS
 sanFile <- sanitizePrs(prsFile,genoBase,from="prscs")
 # PRS coverage is 100% (684425 out of 684425) SNPs
 
 # 2. Grid search (absolute values of beta)
-obj <- gridSearch(prsFile=sanFile,covFile=covFile,trait=trait,genoBase=genoBase,
-    rc=0.2)
+obj <- gridSearch(pip=0,prsFile=sanFile,covFile=covFile,trait=trait,
+    genoBase=genoBase,rc=0.2)
 #Best PRS according to prs_r2 found at:
 #  abs(BETA) > 1e-06
 #  PIP > 0
@@ -1133,6 +1150,30 @@ obj <- gridSearch(prsFile=sanFile,covFile=covFile,trait=trait,genoBase=genoBase,
 
 # 3. Plot results
 p <- gridSearchPlot(obj$metrics,"prs_r2",i=6,j=1)
+
+# PRS-CS with built-in EUR 1000 genomes panel but B4U-wise BIM
+prsFile <- file.path(WORKSPACE,"work","PRS","baseline", 
+    "b4u_tgp_prscs2_pst_eff_a1_b0.5_phiauto.txt")
+
+# 1. Sanitize PRS
+sanFile <- sanitizePrs(prsFile,genoBase,from="prscs")
+# PRS coverage is 62.04% (684475 out of 1103296) SNPs
+
+# 2. Grid search (absolute values of beta)
+obj <- gridSearch(pip=0,prsFile=sanFile,covFile=covFile,trait=trait,
+    genoBase=genoBase,rc=0.2)
+#Best PRS according to prs_r2 found at:
+#  abs(BETA) > 1e-08
+#  PIP > 0
+# i = 4, j = 1
+
+# 3. Plot results
+p <- gridSearchPlot(obj$metrics,"prs_r2",i=4,j=1)
+
+# 4. Export the filtered file
+write.table(obj$prs,file.path(WORKSPACE,"work","PRS","baseline",
+    "b4u_tgp_prscs2_pst_eff_a1_b0.5_phiauto.bst"),sep="\t",quote=FALSE,
+    row.names=FALSE)
 ```
 
 Based on the aforementioned evaluations, it seems that PRS-CS is the choice to
@@ -1299,9 +1340,13 @@ JOBS=14
 
 # Run
 parallel -j ${JOBS} '
+  ITER={}
+  echo "Running iteration $ITER"
+
   python $WORKSPACE/resources/PRScs/PRScs.py \
     --ref_dir=$WORKSPACE/resources/PRScsxLD/ldblk_1kg_eur \
-    --bim_prefix=$WORKSPACE/work/HUABB/only_bim/HUA_unrelated_dbsnp \
+    --bim_prefix=$WORKSPACE/METAL/metal_b4u \
+    #--bim_prefix=$WORKSPACE/work/HUABB/only_bim/HUA_unrelated_dbsnp \
     --sst_file=$WORKSPACE/work/PRS/bootstrap/{}/metal_b4u_sim.csx \
     --n_gwas=232593 \
     --out_dir=$WORKSPACE/work/PRS/bootstrap/{}/b4u_tgp_prscs_sim \
@@ -1318,6 +1363,12 @@ parallel -j ${JOBS} '
     cat $WORKSPACE/work/PRS/bootstrap/{}/b4u_tgp_prscs_sim_pst_eff_a1_b0.5_phiauto_chr${$CHR}.txt
   done > $WORKSPACE/work/PRS/bootstrap/{}/b4u_tgp_prscs_sim_pst_eff_a1_b0.5_phiauto.txt
 ' ::: $(printf "%04d " {1..1000})
+```
+
+Then we run it:
+
+```bash
+nohup bash run_prscs_bootstrap.sh > bootstrap.log &
 ```
 
 
