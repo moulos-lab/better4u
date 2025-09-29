@@ -160,7 +160,11 @@ sanitizePrs <- function(prsFile,genoBase,from=c("sbayesrc","prscs"),pip=0.001) {
         merged$BETA[mismatch] <- -merged$BETA[mismatch]
         merged$A1[mismatch] <- merged$A1_bim[mismatch]
     }
-
+    
+    outCov <- paste0(prsFile,".coverage")
+    message("Writing coverage to ",outCov)
+    writeLines(round(100*coverage,2),outCov)
+    
     # Output final PRS file (with updated A1 and BETA) - we fake the SE, PIP
     # column in the case of PRS-CS
     if (from=="prscs") {
@@ -310,6 +314,24 @@ evalPrs <- function(prsFile,covFile,trait,genoBase,iidCol=2,sum=TRUE,
     else
         fullCor <- cor(fullPred,pcovars[,trait])
     
+    # Direct R2 as suggested by Anders
+    y <- pcovars[,ii]
+    prs <- pcovars[,ncol(pcovars)]
+    covs <- pcovars[,-c(ii,ncol(pcovars))]
+    g_covs <- nong_covs <- NULL
+    hasPC <- grepl("^PC",names(covs),perl=TRUE)
+    if (any(hasPC)) {
+        g_covs <- covs[,hasPC,drop=FALSE]
+        nong_covs <- covs[,!hasPC,drop=FALSE]
+    }
+    else
+        nong_covs <- covs
+    craw <- cor(pcovars[,trait],pcovars$PRS,use="complete.obs")
+    dr2_raw <- craw^2
+    dr2_residy <- directR2(y,prs,nong_covs=nong_covs,g_covs=g_covs)
+    dr2_residb <- directR2(y,prs,nong_covs=nong_covs,g_covs=g_covs,
+        resid_both=TRUE)
+    
     # Now return an object...
     return(list(
         metrics=c(
@@ -317,33 +339,49 @@ evalPrs <- function(prsFile,covFile,trait,genoBase,iidCol=2,sum=TRUE,
             full_r2=fullR2,
             prs_r2=fullR2-nullR2,
             prs_pvalue=coef(fullModel)["PRS",4],
-            #ftest_pvalue=P,
-            #null_rmse=nullRmse,
-            #full_rmse=fullRmse,
-            #null_mae=nullMae,
-            #full_mae=fullMae,
             null_pred_cor=nullCor,
             full_pred_cor=fullCor,
-            #null_pred_r2=nullCor^2,
-            #full_pred_r2=fullCor^2,
-            #prs_pred_r2=fullCor^2-nullCor^2,
-            prs_pheno_cor=cor(pcovars[,trait],pcovars$PRS,use="complete.obs"),
-            prs_pheno_cor_p=cor.test(pcovars[,trait],pcovars$PRS)$p.value
+            prs_pheno_cor=craw,
+            prs_pheno_cor_p=cor.test(pcovars[,trait],pcovars$PRS)$p.value,
+            prs_pheno_r2_raw=craw^2,
+            prs_pheno_r2_resy=dr2_residy,
+            prs_pheno_r2_resb=dr2_residb
         ),
-        prs=pcovars$PRS#,
-        #values=data.frame(
-        #    raw_pheno=pcovars[,trait],
-        #    null_pheno=nullPred,
-        #    full_pheno=fullPred,
-        #    prs=pcovars$PRS,
-        #    row.names=rownames(pcovars)
-        #),
-        #reduced_details=coef(nullModel),
-        #full_details=coef(fullModel),
-        #reduced_ci=confint.default(nullFit),
-        #full_ci=confint.default(fullFit),
-        #plots=ggs
+        prs=pcovars$PRS
     ))
+}
+
+# nong_covs: non-genetic covariates, e.g. age, sex etc NO PCs
+# g_covs: PCs or other genetic covariates
+directR2 <- function(y,prs,nong_covs=NULL,g_covs=NULL,resid_both=FALSE) {
+    stopifnot(length(y) == length(prs))
+  
+    if (is.null(nong_covs) && is.null(g_covs))
+        return(cor(y,prs,use="complete.obs")^2)
+  
+    if (!is.null(nong_covs))
+        nong_covs <- as.data.frame(nong_covs)
+    if (!is.null(g_covs))
+        g_covs <- as.data.frame(g_covs)
+        
+    if (!is.null(nong_covs) &&  !is.null(g_covs))
+        covs <- cbind(nong_covs,g_covs)
+    else if (!is.null(nong_covs) && is.null(g_covs))
+        covs <- nong_covs
+    else if (is.null(nong_covs) && !is.null(g_covs))
+        covs <- g_covs
+    
+    # Residualize y with glm
+    fit_y <- glm(y ~ .,data=covs,family="gaussian")
+    resid_y <- resid(fit_y,type="response")
+  
+    if (!resid_both)
+        return(cor(resid_y,prs[!is.na(resid_y)],use="complete.obs")^2)
+    else {
+        fit_prs <- glm(prs~.,data=g_covs,family="gaussian")
+        resid_prs <- resid(fit_prs,type="response")
+        return(cor(resid_y,resid_prs,use="complete.obs")^2)
+    }
 }
 
 cmclapply <- function(...,rc) {
@@ -370,7 +408,8 @@ cmclapply <- function(...,rc) {
 
 .metricNames <- function() {
     return(c("null_r2","full_r2","prs_r2","prs_pvalue","null_pred_cor",
-        "full_pred_cor","prs_pheno_cor","prs_pheno_cor_p"))
+        "full_pred_cor","prs_pheno_cor","prs_pheno_cor_p","prs_pheno_r2_raw",
+        "prs_pheno_r2_resy","prs_pheno_r2_resb"))
 }
 
 .whichMaxLast <- function(M) {
@@ -482,3 +521,101 @@ perturbBetas <- function(beta,SE,lambda,N=1,seed=NULL) {
 #~ # PRS coverage is 61.48% (563258 out of 916199) SNPs
 #~ # PRS coverage is 58.87% (2157515 out of 3664764) SNPs
 #~ # GCTB runs not very good... why?
+
+#~ # Direct R2 (GLM, Option B: residual space only)
+#~ direct_r2_glm_resid <- function(y, prs, covariates = NULL) {
+#~  stopifnot(is.numeric(y), is.numeric(prs))
+#~  if (!is.null(covariates)) {
+#~      covariates <- as.data.frame(covariates)
+#~      if (nrow(covariates) != length(y))
+#~          stop("covariates must have same number of rows as y/prs")
+#~  }
+  
+#~  # complete cases
+#~  if (is.null(covariates))
+#~      ok <- complete.cases(y, prs)
+#~  else {
+#~      ok <- complete.cases(y, prs, covariates)
+#~      covariates <- covariates[ok, , drop = FALSE]
+#~  }
+#~  y <- y[ok]; prs <- prs[ok]
+#~  n <- length(y)
+#~  if (n < 3)
+#~      stop("Too few complete observations")
+  
+#~  if (var(y) <= .Machine$double.eps) {
+#~      warning("Zero or near-zero variance in y; returning NA")
+#~      return(NA_real_)
+#~  }
+  
+#~  if (is.null(covariates)) {
+#~      resid_y <- y
+#~      resid_prs <- prs
+#~  } 
+#~  else {
+#~      # regress out covariates
+#~      fit_y <- glm(y ~ ., data = covariates, family = gaussian())
+#~      resid_y <- resid(fit_y)
+
+#~      fit_prs <- glm(prs ~ ., data = covariates, family = gaussian())
+#~      resid_prs <- resid(fit_prs)
+#~  }
+  
+#~  # fit resid_y ~ resid_prs
+#~  fit_resid <- glm(resid_y ~ resid_prs, family = gaussian())
+#~  y_hat_resid <- predict(fit_resid, type = "response")
+  
+#~  mse <- mean((resid_y - y_hat_resid)^2)
+#~  r2  <- 1 - mse / var(y)
+    
+#~  return(r2)
+#~ }
+
+#dr2 <- directR2(pcovars[,ii],pcovars[,ncol(pcovars)],
+#    pcovars[,-c(ii,ncol(pcovars))])
+#~ directR2_recal <- function(y,prs,covariates=NULL) {
+#~   stopifnot(length(y) == length(prs))
+  
+#~   if (is.null(covariates)) {
+#~     # Model: phenotype ~ fixed PRS effect (no refitting weights externally)
+#~     fit <- glm(y ~ prs,family="gaussian")
+#~     y_hat <- predict(fit)
+#~   } else {
+#~     # Step 1: regress out covariates from phenotype
+#~     fit_cov <- glm(y ~ ., data=data.frame(covariates),family="gaussian")
+#~     #resid_y <- resid(fit_cov)
+#~     fitted_cov <- predict(fit_cov, type = "response")
+    
+#~     # Step 2: regress out covariates from PRS
+#~     fit_prs <- glm(prs ~ ., data=data.frame(covariates),family="gaussian")
+#~     #resid_prs <- resid(fit_prs)
+#~     fitted_prs_cov <- predict(fit_prs, type = "response")
+    
+#~     ## Step 3: predicted values from residualized PRS
+#~     #beta_prs <- coef(glm(resid_y ~ resid_prs,family="gaussian"))["resid_prs"]
+#~     #y_hat <- beta_prs * resid_prs
+    
+#~     # residuals
+#~     resid_y <- y - fitted_cov
+#~     resid_prs <- prs - fitted_prs_cov
+
+#~     denom <- sum(resid_prs^2)
+#~     if (denom <= .Machine$double.eps) {
+#~       warning("Residualized PRS has (near) zero variance; cannot compute slope")
+#~       return(NA_real_)
+#~     }
+
+#~     # slope from resid_y ~ resid_prs (OLS)
+#~     beta_prs <- sum(resid_y * resid_prs) / denom
+
+#~     # predicted Y on original scale = fitted_cov + beta * resid_prs
+#~     y_hat <- fitted_cov + beta_prs * resid_prs
+#~   }
+  
+#~   mse <- mean((y - y_hat)^2)
+#~   var_y <- var(y)
+  
+#~   r2 <- 1 - mse / var_y
+#~   return(r2)
+#~ }
+
