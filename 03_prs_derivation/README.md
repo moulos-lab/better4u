@@ -950,16 +950,17 @@ rs2286139   T   0   0   0   0
 
 We keep the SNP, A1, BETA, SE (for later introducing noise), PIP and remove SNPs
 with zero effect. We process both 1000 genomes EUR LD and built-in UKB derived 
-PRS:
+PRS (**note** that the R package does not export chromosome, so until we fix it
+in the fork, we attach a 0 for downstream purposes):
 
 ```
 # 1000 genomes
-awk 'NR==1 || $3 != 0 { print $1"\t"$2"\t"$3"\t"$4"\t"$5 }' \
+awk 'NR==1 || $3 != 0 { print "0\t"$1"\t"$2"\t"$3"\t"$4"\t"$5 }' \
   $WORKSPACE/work/PRS/baseline/b4u_tgp_sbrc_prs.txt > \
   $WORKSPACE/work/PRS/baseline/b4u_tgp_sbrc_prs.prs
 
 # Built-in
-awk 'NR==1 || $3 != 0 { print $1"\t"$2"\t"$3"\t"$4"\t"$5 }' \
+awk 'NR==1 || $3 != 0 { print "0\t"$1"\t"$2"\t"$3"\t"$4"\t"$5 }' \
   $WORKSPACE/work/PRS/baseline/b4u_ukb_sbrc_prs.txt > \
   $WORKSPACE/work/PRS/baseline/b4u_ukb_sbrc_prs.prs
 ```
@@ -975,20 +976,20 @@ The GCTB SBayesRC PRS file has the format:
 ...
 ```
 
-We keep the Name, A1, A1Effect, SE (for later introducing noise), PIP and 
-remove SNPs with zero effect. We process both 1000 genomes EUR LD and built-in 
-UKB derived PRS:
+We keep the Chromosome, Name, A1, A1Effect, SE (for later introducing noise),
+PIP and remove SNPs with zero effect. We process both 1000 genomes EUR LD and
+built-in UKB derived PRS:
 
 ```
 # 1000 genomes
-awk 'NR==1 { print "SNP\tA1\tBETA\tSE\tPIP" } 
-     NR>1 && $8 != 0 { print $2"\t"$5"\t"$8"\t"$9"\t"$17 }' \
+awk 'NR==1 { print "CHR\tSNP\tA1\tBETA\tSE\tPIP" } 
+     NR>1 && $8 != 0 { print $3"\t"$2"\t"$5"\t"$8"\t"$9"\t"$17 }' \
   $WORKSPACE/work/PRS/baseline/b4u_tgp_gctb.snpRes > \
   $WORKSPACE/work/PRS/baseline/b4u_tgp_gctb.snpRes.prs
 
 # Built-in
-awk 'NR==1 { print "SNP\tA1\tBETA\tSE\tPIP" } 
-     NR>1 && $8 != 0 { print $2"\t"$5"\t"$8"\t"$9"\t"$17 }' \
+awk 'NR==1 { print "CHR\tSNP\tA1\tBETA\tSE\tPIP" } 
+     NR>1 && $8 != 0 { print $3"\t"$2"\t"$5"\t"$8"\t"$9"\t"$17 }' \
   $WORKSPACE/work/PRS/baseline/b4u_ukb_gctb.snpRes > \
   $WORKSPACE/work/PRS/baseline/b4u_ukb_gctb.snpRes.prs
 ```
@@ -1150,6 +1151,12 @@ obj <- gridSearch(pip=0,prsFile=sanFile,covFile=covFile,trait=trait,
 
 # 3. Plot results
 p <- gridSearchPlot(obj$metrics,"prs_r2",i=6,j=1)
+
+# 4. Export the filtered file
+write.table(obj$prs,file.path(WORKSPACE,"work","PRS","baseline",
+    "b4u_tgp_prscs_pst_eff_a1_b0.5_phiauto.bst"),sep="\t",quote=FALSE,
+    row.names=FALSE)
+    
 
 # PRS-CS with built-in EUR 1000 genomes panel but B4U-wise BIM
 prsFile <- file.path(WORKSPACE,"work","PRS","baseline", 
@@ -1592,7 +1599,7 @@ Rscript \
   }'
 ```
 
-11. Initual SBayesRC running with wrong betas and relaxed thresholds
+11. Initial SBayesRC running with wrong betas and relaxed thresholds
 
 ```bash
 export OMP_NUM_THREADS=32

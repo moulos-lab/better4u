@@ -125,18 +125,33 @@ gridSearchPlot <- function(obj,what,i=NULL,j=NULL,dec=3) {
     return(p)
 }
 
-sanitizePrs <- function(prsFile,genoBase,from=c("sbayesrc","prscs"),pip=0.001) {
+# from="ready" to only perform sanitization and exclude SE and PIP from output
+# if perChr, BIM files are assumed one per chromosome for chrs variable
+# We accept only ending in *{chrSep}{chr}.bim, so if genoBase="COHORT" and
+# chrSep="_" then the bim file is COHORT_chr1.bim
+sanitizePrs <- function(prsFile,genoBase,perChr=FALSE,chrs=seq(22),chrSep="_",
+    from=c("sbayesrc","prscs","ready"),pip=0.001,rc=NULL) {
     from <- from[1]
     
     # Read SNP data (bim) and initial PRS
-    bimFile <- paste0(genoBase,".bim")
-    message("Reading BIM ",bimFile)
-    bim <- read.delim(bimFile,header=FALSE)
-    message("Reading PRS ",prsFile)
-    prs <- read.delim(prsFile,header=from=="sbayesrc")
-
+    if (perChr) {
+        bims <- cmclapply(chrs,function(chr) {
+            bimFile <- paste0(genoBase,chrSep,"chr",chr,".bim")
+            message("Reading BIM ",bimFile)
+            bim <- read.delim(bimFile,header=FALSE)
+        },rc=rc)
+        bim <- do.call("rbind",bim)
+    }
+    else {
+        bimFile <- paste0(genoBase,".bim")
+        message("Reading BIM ",bimFile)
+        bim <- read.delim(bimFile,header=FALSE)
+    }
     # Rename BIM columns for clarity
     colnames(bim) <- c("CHR","SNP","CM","BP","A1_bim","A2_bim")
+    
+    message("Reading PRS ",prsFile)
+    prs <- read.delim(prsFile,header=from %in% c("sbayesrc","ready"))
     
     # Assign header names if prscs
     if (from=="prscs")
@@ -145,6 +160,7 @@ sanitizePrs <- function(prsFile,genoBase,from=c("sbayesrc","prscs"),pip=0.001) {
     # Merge by SNP
     message("Merging by SNP id")
     merged <- merge(prs,bim[,c("SNP","A1_bim","A2_bim")],by="SNP")
+    
     # Consider reporting coverage somewhere...
     coverage <- nrow(merged)/nrow(prs)
     message("PRS coverage is ",paste0(round(100*coverage,2),"%")," (",
@@ -163,7 +179,7 @@ sanitizePrs <- function(prsFile,genoBase,from=c("sbayesrc","prscs"),pip=0.001) {
     
     outCov <- paste0(prsFile,".coverage")
     message("Writing coverage to ",outCov)
-    writeLines(round(100*coverage,2),outCov)
+    writeLines(as.character(round(100*coverage,2)),outCov)
     
     # Output final PRS file (with updated A1 and BETA) - we fake the SE, PIP
     # column in the case of PRS-CS
@@ -171,7 +187,27 @@ sanitizePrs <- function(prsFile,genoBase,from=c("sbayesrc","prscs"),pip=0.001) {
         merged$SE <- 0
         merged$PIP <- pip
     }
-    output <- merged[,c("SNP","A1","BETA","SE","PIP")]
+    if (from == "sbayesrc" && !("CHR" %in% names(merged))) # Until I fix in fork
+        merged$CHR <- 0L
+    if (from %in% c("sbayesrc","prscs"))
+        output <- merged[,c("CHR","SNP","A1","BETA","SE","PIP")]
+    else
+        output <- merged[,c("SNP","A1","BETA","CHR")]
+    
+    # Export per chromosome if required
+    #if (perChr) {
+    #    cmclapply(chrs,function(chr) {
+    #        outFile <- paste0(prsFile,chrSep,chr,".san")
+    #        message("Reading BIM ",bimFile)
+    #        bim <- read.delim(bimFile,header=FALSE)
+    #    },rc=rc)
+    #}
+    #else {
+    #    outFile <- paste0(prsFile,".san")
+    #    write.table(output,file=outFile,quote=FALSE,sep="\t",row.names=FALSE)
+    #}
+    
+    # Export
     outFile <- paste0(prsFile,".san")
     write.table(output,file=outFile,quote=FALSE,sep="\t",row.names=FALSE)
     
@@ -179,8 +215,13 @@ sanitizePrs <- function(prsFile,genoBase,from=c("sbayesrc","prscs"),pip=0.001) {
     return(outFile)
 }
 
-evalPrs <- function(prsFile,covFile,trait,genoBase,iidCol=2,sum=TRUE,
-    center=FALSE,plink=Sys.which("plink")) {
+# When evaluating by chr, then PRS must be calculated per chr and the individual
+# files must be concatenated and then added to the covariates. The same things
+# as sanitizePrs apply if calculations are done per chromosome. If the latter,
+# PRS file is firstly split and then calculations are made.
+evalPrs <- function(prsFile,covFile,trait,genoBase,perChr=FALSE,chrs=seq(22),
+    chrSep="_",iidCol=2,sum=TRUE,center=FALSE,plink=Sys.which("plink"),
+    rc=NULL) {
     # Base name for plink score output
     prsName <- sub("\\.[^.]*$","",prsFile)
     
@@ -232,26 +273,65 @@ evalPrs <- function(prsFile,covFile,trait,genoBase,iidCol=2,sum=TRUE,
     #    sep="\n"
     #)
     #message("\nExecuting:\n",command)
-    args <- c("--bfile",genoBase,"--score",prsFile,"1 2 3 header",
-        ifelse(sum,"sum",""),ifelse(center,"center",""),"--out",prsName)
-    if (!is.null(remFile))
-        args <- c(args,"--remove",remFile)
-    args <- c(args,"--silent")
-    out <- tryCatch({
-        suppressWarnings(system2(plink,args=args))
-        TRUE
-    },error=function(e) {
-        message("Caught error: ",e$message)
-        return(FALSE)
-    },finally="")
+    if (perChr) {
+        # Firstly split prsFile into files per chromosome. It should be 
+        # sanitized so it has 4 columns, the 4th is chromosome.
+        tmpPrs <- read.delim(prsFile)
+        tmpSplit <- split(tmpPrs,tmpPrs$CHR)
+        prsSplit <- unlist(cmclapply(names(tmpSplit),function(chr) {
+            o <- tempfile()
+            o <- paste0(o,"_",chr)
+            write.table(tmpSplit[[chr]][,1:3],file=o,sep="\t",row.names=FALSE,
+                quote=FALSE)
+            return(o)
+        },rc=rc))
+        names(prsSplit) <- names(tmpSplit)
+        
+        # Now calculate scores per chromosome
+        cmclapply(chrs,function(chr) {
+            bFile <- paste0(genoBase,chrSep,"chr",chr)
+            pFile <- prsSplit[chr]
+            o <- tempfile()
+            o <- paste0(o,"_prs_",chr)
+            args <- c("--bfile",bFile,"--score",pFile,"1 2 3 header",
+                ifelse(sum,"sum",""),ifelse(center,"center",""),"--out",o)
+            if (!is.null(remFile))
+                args <- c(args,"--remove",remFile)
+            args <- c(args,"--silent")
+            out <- tryCatch({
+                suppressWarnings(system2(plink,args=args))
+                TRUE
+            },error=function(e) {
+                message("Caught error: ",e$message)
+                return(FALSE)
+            },finally="")
+        },rc=rc)
+        
+        # Then somehow read and combine... essentially for the individuals
+        # (row) add #chrs columns and create a data frame with one col SCORE
+    }
+    else {
+        args <- c("--bfile",genoBase,"--score",prsFile,"1 2 3 header",
+            ifelse(sum,"sum",""),ifelse(center,"center",""),"--out",prsName)
+        if (!is.null(remFile))
+            args <- c(args,"--remove",remFile)
+        args <- c(args,"--silent")
+        out <- tryCatch({
+            suppressWarnings(system2(plink,args=args))
+            TRUE
+        },error=function(e) {
+            message("Caught error: ",e$message)
+            return(FALSE)
+        },finally="")
 
-    if (!out)
-        stop("Failed to generate score file! Exiting...")
-    
-    # If all ok, read the score file
-    scoreFile <- paste0(prsName,".profile")
-    theScore <- read.table(scoreFile,row.names=2,header=TRUE)
-    
+        if (!out)
+            stop("Failed to generate score file! Exiting...")
+        
+        # If all ok, read the score file
+        scoreFile <- paste0(prsName,".profile")
+        theScore <- read.table(scoreFile,row.names=2,header=TRUE)
+    }
+        
     # ...and prepare metrics, regressions
     ii <- which(colnames(covars)==trait)
     colnames(covars) <- make.names(colnames(covars))
