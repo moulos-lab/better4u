@@ -1,6 +1,7 @@
 library(parallel)
 library(ggplot2)
 library(reshape2)
+library(R.utils)
 
 gridSearch <- function(pip=c(0,0.001,0.005,0.01,0.05,0.1,0.2,0.3,0.4),
     beta=c(0,1e-10,1e-9,1e-8,1e-7,1e-6,1e-5,1e-4,1e-3),metric="prs_r2",prsFile,
@@ -40,8 +41,8 @@ gridSearch <- function(pip=c(0,0.001,0.005,0.01,0.05,0.1,0.2,0.3,0.4),
             #message("    abs(BETA) > ",b," : ",nrow(gprs)," SNPs")
             griFile <- tempfile()
             write.table(gprs,file=griFile,sep="\t",row.names=FALSE,quote=FALSE)
-            return(evalPrs(griFile,covFile,trait,genoBase,iidCol,sum,center,
-                plink))
+            return(evalPrs(griFile,covFile,trait,genoBase,iidCol=iidCol,sum=sum,
+                center=center,plink=plink))
         },rc=rc)
         names(inner) <- paste("abs(BETA)>",beta,sep="")
         for (b in beta)
@@ -125,6 +126,33 @@ gridSearchPlot <- function(obj,what,i=NULL,j=NULL,dec=3) {
     return(p)
 }
 
+formatPrs <- function(prsFile,outFile,from=c("sbayesrc","prscs"),pip=0.001) {
+    from <- from[1]
+    
+    message("Reading PRS ",prsFile)
+    prs <- read.delim(prsFile,header=from=="sbayesrc")
+    
+    # Assign header names if prscs
+    if (from=="prscs")
+        colnames(prs) <- c("CHR","SNP","BP","A1","A2","BETA")
+
+    # Output final PRS file ready-made for further downstream analysis
+    if (from=="prscs") {
+        prs$SE <- 0
+        prs$PIP <- pip
+    }
+    
+    # Order output by chromosome
+    message("Ordering output by chromosome")
+    prs <- prs[order(prs$CHR,prs$SNP),]
+    
+    # Export
+    write.table(prs,file=outFile,quote=FALSE,sep="\t",row.names=FALSE)
+    
+    message("Formatted PRS is in ",outFile)
+    return(outFile)
+}
+
 # from="ready" to only perform sanitization and exclude SE and PIP from output
 # if perChr, BIM files are assumed one per chromosome for chrs variable
 # We accept only ending in *{chrSep}{chr}.bim, so if genoBase="COHORT" and
@@ -133,6 +161,16 @@ sanitizePrs <- function(prsFile,genoBase,perChr=FALSE,chrs=seq(22),chrSep="_",
     from=c("sbayesrc","prscs","ready"),pip=0.001,rc=NULL) {
     from <- from[1]
     
+    # Basic check, make sure that PLINK files exist
+    if (perChr) {
+        if (!file.exists(paste0(genoBase,chrSep,"chr1.bim")))
+            stop("PLINK files not found where expected!")
+    }
+    else {
+        if (!file.exists(paste0(genoBase,".bim")))
+            stop("PLINK files not found where expected! genoBase is ",genoBase)
+    }
+    
     # Read SNP data (bim) and initial PRS
     if (perChr) {
         bims <- cmclapply(chrs,function(chr) {
@@ -140,7 +178,7 @@ sanitizePrs <- function(prsFile,genoBase,perChr=FALSE,chrs=seq(22),chrSep="_",
             message("Reading BIM ",bimFile)
             bim <- read.delim(bimFile,header=FALSE)
         },rc=rc)
-        bim <- do.call("rbind",bim)
+        bim <- do.call("rbind",bims)
     }
     else {
         bimFile <- paste0(genoBase,".bim")
@@ -177,9 +215,9 @@ sanitizePrs <- function(prsFile,genoBase,perChr=FALSE,chrs=seq(22),chrSep="_",
         merged$A1[mismatch] <- merged$A1_bim[mismatch]
     }
     
-    outCov <- paste0(prsFile,".coverage")
-    message("Writing coverage to ",outCov)
-    writeLines(as.character(round(100*coverage,2)),outCov)
+    #outCov <- paste0(prsFile,".coverage")
+    #message("Writing coverage to ",outCov)
+    #writeLines(as.character(round(100*coverage,2)),outCov)
     
     # Output final PRS file (with updated A1 and BETA) - we fake the SE, PIP
     # column in the case of PRS-CS
@@ -190,9 +228,12 @@ sanitizePrs <- function(prsFile,genoBase,perChr=FALSE,chrs=seq(22),chrSep="_",
     if (from == "sbayesrc" && !("CHR" %in% names(merged))) # Until I fix in fork
         merged$CHR <- 0L
     if (from %in% c("sbayesrc","prscs"))
-        output <- merged[,c("CHR","SNP","A1","BETA","SE","PIP")]
+        output <- merged[,c("SNP","A1","BETA","CHR","SE","PIP")]
     else
         output <- merged[,c("SNP","A1","BETA","CHR")]
+    # Order output by chromosome
+    message("Ordering output by chromosome")
+    output <- output[order(output$CHR,output$SNP),]
     
     # Export per chromosome if required
     #if (perChr) {
@@ -219,11 +260,17 @@ sanitizePrs <- function(prsFile,genoBase,perChr=FALSE,chrs=seq(22),chrSep="_",
 # files must be concatenated and then added to the covariates. The same things
 # as sanitizePrs apply if calculations are done per chromosome. If the latter,
 # PRS file is firstly split and then calculations are made.
+# NOTE well that there are tiny differences (range -10e-6, 10e-6 for HUA) 
+# between the two approaches which are attributed to floating point rounds and
+# calculations.
 evalPrs <- function(prsFile,covFile,trait,genoBase,perChr=FALSE,chrs=seq(22),
     chrSep="_",iidCol=2,sum=TRUE,center=FALSE,plink=Sys.which("plink"),
     rc=NULL) {
     # Base name for plink score output
     prsName <- sub("\\.[^.]*$","",prsFile)
+    
+    # Number of SNPs in PRS
+    nsnps <- as.numeric(countLines(prsFile)) - 1
     
     # Find plink - MUST be in PATH or provided
     if (is.null(plink) || plink == "" || !file.exists(plink))
@@ -288,7 +335,8 @@ evalPrs <- function(prsFile,covFile,trait,genoBase,perChr=FALSE,chrs=seq(22),
         names(prsSplit) <- names(tmpSplit)
         
         # Now calculate scores per chromosome
-        cmclapply(chrs,function(chr) {
+        scoreFiles <- unlist(cmclapply(chrs,function(chr) {
+            message("Calculating score with PLINK --score for ",chr)
             bFile <- paste0(genoBase,chrSep,"chr",chr)
             pFile <- prsSplit[chr]
             o <- tempfile()
@@ -305,12 +353,20 @@ evalPrs <- function(prsFile,covFile,trait,genoBase,perChr=FALSE,chrs=seq(22),
                 message("Caught error: ",e$message)
                 return(FALSE)
             },finally="")
-        },rc=rc)
+            return(paste0(o,".profile"))
+        },rc=rc))
         
         # Then somehow read and combine... essentially for the individuals
         # (row) add #chrs columns and create a data frame with one col SCORE
+        chrScores <- cmclapply(scoreFiles,function(f) {
+            tmpScore <- read.table(f,row.names=2,header=TRUE)
+            return(tmpScore[,"SCORESUM",drop=FALSE])
+        })
+        chrScores <- do.call("cbind",chrScores)
+        theScore <- data.frame(SCORE=rowSums(chrScores))
     }
     else {
+        #message("Calculating score with PLINK --score")
         args <- c("--bfile",genoBase,"--score",prsFile,"1 2 3 header",
             ifelse(sum,"sum",""),ifelse(center,"center",""),"--out",prsName)
         if (!is.null(remFile))
@@ -425,7 +481,12 @@ evalPrs <- function(prsFile,covFile,trait,genoBase,perChr=FALSE,chrs=seq(22),
             prs_pheno_cor_p=cor.test(pcovars[,trait],pcovars$PRS)$p.value,
             prs_pheno_r2_raw=craw^2,
             prs_pheno_r2_resy=dr2_residy,
-            prs_pheno_r2_resb=dr2_residb
+            prs_pheno_r2_resb=dr2_residb,
+            snps_covered=nsnps#,
+            #penal_prs_r2=-log10((fullR2-nullR2)/nsnps),
+            #penal_prs_pheno_cor=-log10(craw/nsnps),
+            #penal_prs_pheno_r2_resy=-log10(dr2_residy/nsnps),
+            #penal_prs_pheno_r2_resb=-log10(dr2_residb/nsnps)
         ),
         prs=pcovars$PRS
     ))
@@ -489,7 +550,9 @@ cmclapply <- function(...,rc) {
 .metricNames <- function() {
     return(c("null_r2","full_r2","prs_r2","prs_pvalue","null_pred_cor",
         "full_pred_cor","prs_pheno_cor","prs_pheno_cor_p","prs_pheno_r2_raw",
-        "prs_pheno_r2_resy","prs_pheno_r2_resb"))
+        "prs_pheno_r2_resy","prs_pheno_r2_resb","nsnps"))#,"penal_prs_r2",
+        #"penal_prs_pheno_cor","penal_prs_pheno_r2_resy",
+        #"penal_prs_pheno_r2_resb"))
 }
 
 .whichMaxLast <- function(M) {

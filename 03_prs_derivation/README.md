@@ -1139,6 +1139,7 @@ prsFile <- file.path(WORKSPACE,"work","PRS","baseline",
 
 # 1. Sanitize PRS
 sanFile <- sanitizePrs(prsFile,genoBase,from="prscs")
+#sanFile <- sanitizePrs(prsFile,genoBase,perChr=TRUE,from="prscs",rc=0.25)
 # PRS coverage is 100% (684425 out of 684425) SNPs
 
 # 2. Grid search (absolute values of beta)
@@ -1164,6 +1165,7 @@ prsFile <- file.path(WORKSPACE,"work","PRS","baseline",
 
 # 1. Sanitize PRS
 sanFile <- sanitizePrs(prsFile,genoBase,from="prscs")
+#sanFile <- sanitizePrs(prsFile,genoBase,perChr=TRUE,from="prscs",rc=0.25)
 # PRS coverage is 62.04% (684475 out of 1103296) SNPs
 
 # 2. Grid search (absolute values of beta)
@@ -1184,7 +1186,15 @@ write.table(obj$prs,file.path(WORKSPACE,"work","PRS","baseline",
 ```
 
 Based on the aforementioned evaluations, it seems that PRS-CS is the choice to
-go for BMI (and subsequently weight/BMI change).
+go for BMI (and subsequently weight/BMI change). We export the initial file in a
+format suitable for downstream analysis:
+
+```
+prsFile <- file.path(WORKSPACE,"work","PRS","baseline", 
+    "b4u_tgp_prscs2_pst_eff_a1_b0.5_phiauto.txt")
+outFile <- file.path(WORKSPACE,"work","PRS","baseline","b4u_bmi_baseline.prs")
+formatPrs(prsFile,outFile,from="prscs")
+```
 
 ## PRS bootstrapping with PRS-CS
 
@@ -1367,7 +1377,7 @@ wait
 parallel -j ${JOBS} '
   for CHR in $(seq 1 22); 
   do
-    cat $WORKSPACE/work/PRS/bootstrap/{}/b4u_tgp_prscs_sim_pst_eff_a1_b0.5_phiauto_chr${$CHR}.txt
+    cat $WORKSPACE/work/PRS/bootstrap/{}/b4u_tgp_prscs_sim_pst_eff_a1_b0.5_phiauto_chr${CHR}.txt
   done > $WORKSPACE/work/PRS/bootstrap/{}/b4u_tgp_prscs_sim_pst_eff_a1_b0.5_phiauto.txt
 ' ::: $(printf "%04d " {1..1000})
 ```
@@ -1378,6 +1388,315 @@ Then we run it:
 nohup bash run_prscs_bootstrap.sh > bootstrap.log &
 ```
 
+### Evaluation of the bootstrap process
+
+The R code below is used to post-process the outcome of the PRS-CS iterations.
+
+```R
+WORKSPACE <- Sys.getenv("WORKSPACE")
+
+BOOTSPACE <- file.path(WORKSPACE,"work","PRS","bootstrap")
+
+source(file.path(WORKSPACE,"resources","better4u","03_prs_derivation",
+    "evalfuns.R"))
+    
+# Genetic data file (HUABB)
+genoBase <- file.path(WORKSPACE,"work","HUABB","HUA_unrelated_dbsnp")
+# Covariates file (sex, age, age^2, PCs) and trait
+covFile <- file.path(WORKSPACE,"work","HUABB","huabb","HUA_covariates.txt")
+trait <- "bmi"
+
+# Create map of A1 alleles and chromosomes
+mainPrsFile <- file.path(WORKSPACE,"work","PRS","baseline",
+    "b4u_tgp_prscs2_pst_eff_a1_b0.5_phiauto.txt")
+mainPrs <- read.delim(mainPrsFile,header=FALSE)
+orgBetas <- mainPrs[,6]
+names(orgBetas) <- mainPrs[,2]
+
+mapFile <- read.delim("0001/b4u_tgp_prscs_sim_pst_eff_a1_b0.5_phiauto.txt",
+    header=FALSE)
+A1s <- mapFile[,4]
+chroms <- mapFile[,1]
+names(A1s) <- names(chroms) <- mapFile[,2]
+
+# Create list of iteration PRSs based on BETA
+beps <- 1e-5 #BETA filter - remove very small effects
+iters <- seq(1000)
+freq <- 950 # Keep SNPs appearing at least 951-1000 times
+N <- length(iters)
+
+# Read and filter PRS files
+collection <- cmclapply(iters,function(i) {
+    # Read the data
+    message("Reading iteration ",i)
+    runDir <- file.path(BOOTSPACE,sprintf("%04d",i))
+    iterPrsFile <- file.path(runDir,
+        "b4u_tgp_prscs_sim_pst_eff_a1_b0.5_phiauto.txt")
+    prePrs <- read.delim(iterPrsFile,header=FALSE)
+    colnames(prePrs) <- c("CHR","SNP","BP","A1","A2","BETA")
+    rownames(prePrs) <- prePrs$SNP
+    return(prePrs[abs(prePrs$BETA)>=beps,])
+},rc=1)
+
+# Create the candidates pool
+snpPool <- lapply(collection,function(x) return(x$SNP))
+preCandidates <- table(unlist(snpPool)) # Long time
+candidates <- names(preCandidates[preCandidates>freq])
+
+# Get matrices of alleles, for sanity check - once
+#a1s <- a2s <- matrix(NA,length(preCandidates),N)
+#rownames(a1s) <- rownames(a2s) <- names(preCandidates)
+#for (i in 1:N) {
+#   message("Assigning alleles for iter ",i)
+#   a1s[rownames(collection[[i]]),i] <- collection[[i]]$A1
+#   a2s[rownames(collection[[i]]),i] <- collection[[i]]$A2
+#}
+## Sanity check for allele alignment - all OK
+#a1 <- apply(a1s,1,function(r) {
+#   if (any(is.na(r)))
+#       r <- r[!is.na(r)]
+#   return(all(r==r[1]))
+#})
+#a2 <- apply(a2s,1,function(r) {
+#   if (any(is.na(r)))
+#       r <- r[!is.na(r)]
+#   return(all(r==r[1]))
+#})
+
+# Create a matrix of betas
+betas <- matrix(0,length(preCandidates),N)
+rownames(betas) <- names(preCandidates)
+for (i in 1:N) {
+    message("Assigning effects for iter ",i)
+    betas[rownames(collection[[i]]),i] <- collection[[i]]$BETA
+}
+
+# Gather required betas
+bmean <- apply(betas,1,function(x) {
+    return(mean(x[x!=0]))
+})
+bmedian <- apply(betas,1,function(x) {
+    return(median(x[x!=0]))
+})
+bmeanSel <- bmean[candidates]
+bmedianSel <- bmedian[candidates]
+
+# Construct score files
+meanApproach <- data.frame(
+    SNP=names(bmeanSel),
+    A1=A1s[names(bmeanSel)],
+    BETA=bmeanSel,
+    CHR=chroms[names(bmeanSel)]
+)
+medianApproach <- data.frame(
+    SNP=names(bmedianSel),
+    A1=A1s[names(bmedianSel)],
+    BETA=bmedianSel,
+    CHR=chroms[names(bmedianSel)]
+)
+orgApproach <- data.frame(
+    SNP=names(bmeanSel),
+    A1=A1s[names(bmeanSel)],
+    BETA=orgBetas[names(bmeanSel)],
+    CHR=chroms[names(bmeanSel)]
+)
+
+# Write output
+write.table(meanApproach,file=file.path(BOOTSPACE,"mean_approach.prs"),sep="\t",
+    row.names=FALSE,quote=FALSE)
+write.table(medianApproach,file=file.path(BOOTSPACE,"median_approach.prs"),
+    sep="\t",row.names=FALSE,quote=FALSE)
+write.table(orgApproach,file=file.path(BOOTSPACE,"org_approach.prs"),
+    sep="\t",row.names=FALSE,quote=FALSE)
+
+# Required for distribution
+orgApproachMore <- data.frame(
+    CHR=chroms[names(bmeanSel)],
+    SNP=names(bmeanSel),
+    A1=A1s[names(bmeanSel)],
+    BETA=orgBetas[names(bmeanSel)],
+    SE=0,
+    PIP=0.001
+)
+orgApproachMore <- orgApproachMore[order(orgApproachMore$CHR,orgApproachMore$SNP),]
+write.table(orgApproachMore,file=file.path(BOOTSPACE,"org_approach_dist.prs"),
+    sep="\t",row.names=FALSE,quote=FALSE)
+```
+
+Now we calculate metrics for the various approaches (TLDR: not working as 
+expected). **NOTE**: run the step below where we recalibrate PRS-CS SNP weights
+before running the following chunk.
+
+```R
+# Mean effects
+prsFile <- file.path(BOOTSPACE,"mean_approach.prs")
+sanFile <- sanitizePrs(prsFile,genoBase,from="ready")
+Mmean <- evalPrs(sanFile,covFile,trait,genoBase)
+Nmean <- as.numeric(countLines(prsFile)) - 1
+
+# Median effects
+prsFile <- file.path(BOOTSPACE,"median_approach.prs")
+sanFile <- sanitizePrs(prsFile,genoBase,from="ready")
+Mmedian <- evalPrs(sanFile,covFile,trait,genoBase)
+Nmedian <- as.numeric(countLines(prsFile)) - 1
+
+# Mean effects
+prsFile <- file.path(BOOTSPACE,"org_approach.prs")
+sanFile <- sanitizePrs(prsFile,genoBase,from="ready")
+Morg <- evalPrs(sanFile,covFile,trait,genoBase)
+Norg <- as.numeric(countLines(prsFile)) - 1
+
+# Baseline PRS-CS
+prsFile <- file.path(WORKSPACE,"work","PRS","baseline", 
+    "b4u_tgp_prscs2_pst_eff_a1_b0.5_phiauto.txt")
+sanFile <- sanitizePrs(prsFile,genoBase,from="prscs")
+Mbase <- evalPrs(sanFile,covFile,trait,genoBase)
+Nbase <- as.numeric(countLines(prsFile)) - 1
+
+# Recalibrated PRS-CS
+prePrsFile <- file.path(WORKSPACE,"work","PRS","final", 
+    "b4u_tgp_prscs_robust_pst_eff_a1_b0.5_phiauto.txt")
+prsFile <- file.path(BOOTSPACE,"recal_approach.prs")
+prsFile <- formatPrs(prePrsFile,prsFile,from="prscs")
+sanFile <- sanitizePrs(prsFile,genoBase,from="prscs")
+Mrecal <- evalPrs(sanFile,covFile,trait,genoBase)
+Nrecal <- as.numeric(countLines(prsFile)) - 1
+
+# Baseline SBayesRC
+prsFile <- file.path(WORKSPACE,"work","PRS","baseline","b4u_tgp_gctb.snpRes.prs")
+sanFile <- sanitizePrs(prsFile,genoBase)
+Msbay <- evalPrs(sanFile,covFile,trait,genoBase)
+Nsbay <- as.numeric(countLines(prsFile)) - 1
+
+# Baseline SBayesRC UKB
+prsFile <- file.path(WORKSPACE,"work","PRS","baseline","b4u_ukb_gctb.snpRes.prs")
+sanFile <- sanitizePrs(prsFile,genoBase)
+Msbau <- evalPrs(sanFile,covFile,trait,genoBase)
+Nsbau <- as.numeric(countLines(prsFile)) - 1
+
+# Gather metrics
+metrics <- data.frame(
+    mean=formatC(Mmean$metrics,digits=6),
+    median=formatC(Mmedian$metrics,digits=6),
+    orig=formatC(Morg$metrics,digits=6),
+    base=formatC(Mbase$metrics,digits=6),
+    recal=formatC(Mrecal$metrics,digits=6),
+    sbay=formatC(Msbay$metrics,digits=6),
+    sbau=formatC(Msbau$metrics,digits=6)
+)
+
+# Additonal data
+add <- as.data.frame(rbind(
+    as.integer(c(Nmean,Nmedian,Norg,Nbase,Nrecal,Nsbay,Nsbau)),
+    round(100*as.numeric(metrics[nrow(metrics),])/
+        c(Nmean,Nmedian,Norg,Nbase,Nrecal,Nsbay,Nsbau),digits=2)
+))
+rownames(add) <- c("snps_total","coverage")
+colnames(add) <- names(metrics)
+
+# Final metrics data frame
+finalMetrics <- rbind(metrics,add)
+
+write.table(finalMetrics,file="baseline_bmi_prs_metrics.txt",sep="\t",
+    quote=FALSE,col.names=NA)
+```
+
+The initial plan does not seem to work as expected. We have indetified though
+a set of robust SNPs. We retrain a PRS-CS PRS based on these:
+
+```R
+# Write a BIM file with robust SNPs for PRS-CS realignment
+snpinfo <- read.delim(file.path(WORKSPACE,"work","METAL","metal_b4u.bim"),
+    header=FALSE)
+rownames(snpinfo) <- snpinfo[,2]
+robim <- data.frame(
+    meanApproach$CHR,
+    meanApproach$SNP,
+    0,
+    snpinfo[meanApproach$SNP,4],
+    snpinfo[meanApproach$SNP,5],
+    snpinfo[meanApproach$SNP,6]
+)
+robim <- robim[order(robim[,1],robim[,4]),]
+write.table(robim,file=file.path(BOOTSPACE,"robust.bim"),sep="\t",quote=FALSE,
+    row.names=FALSE,col.names=FALSE)
+```
+
+and then, we retain PRS-CS with the robust SNPs
+
+```bash
+FINALSPACE=$WORKSPACE/work/PRS/final
+mkdir $FINALSPACE
+
+nohup python $WORKSPACE/resources/PRScs/PRScs.py \
+  --ref_dir=$WORKSPACE/resources/PRScsxLD/ldblk_1kg_eur \
+  --bim_prefix=$WORKSPACE/work/PRS/bootstrap/robust \
+  --sst_file=$WORKSPACE/work/METAL/metal_b4u.csx \
+  --n_gwas=232593 \
+  --out_dir=$FINALSPACE/b4u_tgp_prscs_robust \
+  > $FINALSPACE/b4u_tgp_prscs_robust.log 2>&1 &
+  
+wait
+
+cd $FINALSPACE
+for i in {1..22}; 
+do
+  cat b4u_tgp_prscs_robust_pst_eff_a1_b0.5_phiauto_chr${i}.txt
+done > b4u_tgp_prscs_robust_pst_eff_a1_b0.5_phiauto.txt
+```
+
+### Create baseline BMI PRS files for distribution
+
+Finally, we distribute for evaluation the following cases:
+
+* GCTB SBayesRC with 1000 genomes EUR LD panel
+* GCTB SBayesRC with 1000 genomes UKB LD panel
+* PRS-CS original version with BETTER4U BIM and EUR LD panel
+* PRS-CS robust version with BETTER4U, EUR LD panel and original weights
+* PRS-CS recalibrated version with BETTER4U BIM and EUR LD panel
+
+The following R code creates the files to be distributed:
+
+```R
+WORKSPACE <- Sys.getenv("WORKSPACE")
+
+source(file.path(WORKSPACE,"resources","better4u","03_prs_derivation",
+    "evalfuns.R"))
+
+DISTSPACE <- file.path(WORKSPACE,"work","PRS","distribute")
+if (!dir.exists(DISTSPACE))
+    dir.create(DISTSPACE,recursive=TRUE,showWarnings=FALSE)
+
+# Format GCTB SBayesRC with 1000 genomes LD panel
+prePrsFile <- file.path(WORKSPACE,"work","PRS","baseline",
+    "b4u_tgp_gctb.snpRes.prs")
+prsFile <- file.path(DISTSPACE,"b4u_bmi_sbrc_tgp.prs")
+prsFile <- formatPrs(prePrsFile,prsFile,from="sbayesrc")
+
+# Format GCTB SBayesRC with UKB LD panel
+prePrsFile <- file.path(WORKSPACE,"work","PRS","baseline",
+    "b4u_ukb_gctb.snpRes.prs")
+prsFile <- file.path(DISTSPACE,"b4u_bmi_sbrc_ukb.prs")
+prsFile <- formatPrs(prePrsFile,prsFile,from="sbayesrc")
+
+# Format PRS-CS original (EUR LD panel, B4U BIM)
+prePrsFile <- file.path(WORKSPACE,"work","PRS","baseline", 
+    "b4u_tgp_prscs2_pst_eff_a1_b0.5_phiauto.txt")
+prsFile <- file.path(DISTSPACE,"b4u_bmi_prscs_original.prs")
+prsFile <- formatPrs(prePrsFile,prsFile,from="prscs")
+
+# PRS-CS robust (EUR LD panel, B4U BIM) - already formatted from above
+prePrsFile <- file.path(WORKSPACE,"work","PRS","bootstrap", 
+    "org_approach_dist.prs")
+prsFile <- file.path(DISTSPACE,"b4u_bmi_prscs_robust.prs")
+file.copy(from=prePrsFile,to=prsFile)
+
+# Format PRS-CS original (EUR LD panel, B4U BIM)
+prePrsFile <- file.path(WORKSPACE,"work","PRS","baseline", 
+    "b4u_tgp_prscs2_pst_eff_a1_b0.5_phiauto.txt")
+prsFile <- file.path(DISTSPACE,"b4u_bmi_prscs_original.prs")
+prsFile <- formatPrs(prePrsFile,prsFile,from="prscs")
+```
 
 #### Notes
 
