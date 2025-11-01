@@ -1691,10 +1691,10 @@ prePrsFile <- file.path(WORKSPACE,"work","PRS","bootstrap",
 prsFile <- file.path(DISTSPACE,"b4u_bmi_prscs_robust.prs")
 file.copy(from=prePrsFile,to=prsFile)
 
-# Format PRS-CS original (EUR LD panel, B4U BIM)
-prePrsFile <- file.path(WORKSPACE,"work","PRS","baseline", 
-    "b4u_tgp_prscs2_pst_eff_a1_b0.5_phiauto.txt")
-prsFile <- file.path(DISTSPACE,"b4u_bmi_prscs_original.prs")
+# Format PRS-CS recalibrated (EUR LD panel, B4U BIM)
+prePrsFile <- file.path(WORKSPACE,"work","PRS","final", 
+    "b4u_tgp_prscs_robust_pst_eff_a1_b0.5_phiauto.txt")
+prsFile <- file.path(DISTSPACE,"b4u_bmi_prscs_recalibrated.prs")
 prsFile <- formatPrs(prePrsFile,prsFile,from="prscs")
 ```
 
