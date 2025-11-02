@@ -1151,6 +1151,12 @@ obj <- gridSearch(pip=0,prsFile=sanFile,covFile=covFile,trait=trait,
 # 3. Plot results
 p <- gridSearchPlot(obj$metrics,"prs_r2",i=6,j=1)
 
+# 4. Export the filtered file
+write.table(obj$prs,file.path(WORKSPACE,"work","PRS","baseline",
+    "b4u_tgp_prscs_pst_eff_a1_b0.5_phiauto.bst"),sep="\t",quote=FALSE,
+    row.names=FALSE)
+    
+
 # PRS-CS with built-in EUR 1000 genomes panel but B4U-wise BIM
 prsFile <- file.path(WORKSPACE,"work","PRS","baseline", 
     "b4u_tgp_prscs2_pst_eff_a1_b0.5_phiauto.txt")
@@ -1592,7 +1598,7 @@ Rscript \
   }'
 ```
 
-11. Initual SBayesRC running with wrong betas and relaxed thresholds
+11. Initial SBayesRC running with wrong betas and relaxed thresholds
 
 ```bash
 export OMP_NUM_THREADS=32
