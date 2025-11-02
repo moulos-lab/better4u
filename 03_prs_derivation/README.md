@@ -15,9 +15,21 @@ BETTER4U Task 3.7 analysis plan (internal and shared)
 # Introduction
 
 This analysis plan covers the work required for the completion of BETTER4U WP3
-Task 3.7: Development of an iterative PRS extraction pipeline
+Task 3.7: Development of an iterative PRS extraction pipeline. Based on the
+availability of genetic data, the initial plan was adjusted. This document
+describes the following:
 
-The task comprises X main parts (from PPT)
+* Setup of SBayesRC, GCTB and PRS-CS
+* Retrieval and preprocessing of 1000 genomes data
+* Construction of an LD panel from 1000 genomes EUR for use with SBayesRC
+* PRS derivation with various versions and LD panels with SBayesRC
+* PRS derivation with PRS-CS (EUR LD)
+* Bootstrap derivation of robust SNPs using PRS-CS
+* Evaluation of the derived PRS
+* Derivation of PRS score files to be distributed across partners
+
+_TBD_: Processes for weight change - WIP
+
 
 ## Required software
 
