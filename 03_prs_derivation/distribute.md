@@ -21,7 +21,7 @@ from performance metrics.
 The data that will be collected from each cohort can be summarized to:
 
 * Calculation of baseline PRS for BMI using PRS-CS and SBayesRC derived scores
-* Calculation of baseline PRS for weight change useing PRS-CS(x) derived score (_TBD_)
+* Calculation of baseline PRS for weight change useing PRS-CS(x) derived score (_WIP_)
 * Calculation of baseline PRS for BMI using robustified set of SNPs from PRS-CS bootstrap
 * Calculation of performance metrics for all PRS versions
 
@@ -32,7 +32,6 @@ cohort data also as PLINK BED files, either as a whole or per chromosome.
 ## Required software
 
 * [PLINK 1.90](https://www.cog-genomics.org/plink/)
-* [bcftools](https://samtools.github.io/bcftools/bcftools.html)
 * [R](https://www.r-project.org/)
 * [gdown](https://github.com/wkentaro/gdown) (optional)
 * [This](https://github.com/moulos-lab/better4u/blob/main/03_prs_derivation/evalfuns.R) set of R scripts
