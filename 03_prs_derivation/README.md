@@ -54,9 +54,11 @@ WORKSPACE
 |  |__METAL
 |__|__PRS
 |__bootstrap
-|  |__1
-|__|__2
+|  |__0001
+|__|__0002
 |__|__...
+|__final
+|__distribute
 ```
 
 We create the structure:
@@ -68,7 +70,9 @@ mkdir -p $WORKSPACE/resources
 mkdir -p $WORKSPACE/work/METAL
 mkdir -p $WORKSPACE/work/PRS/baseline
 mkdir -p $WORKSPACE/work/PRS/bootstrap
-mkdir -p $WORKSPACE/work/LOO
+mkdir -p $WORKSPACE/work/PRS/final
+mkdir -p $WORKSPACE/work/PRS/distribute
+#mkdir -p $WORKSPACE/work/LOO
 ```
 
 ### SBayesRC
