@@ -21,7 +21,7 @@ from performance metrics.
 The data that will be collected from each cohort can be summarized to:
 
 * Calculation of baseline PRS for BMI using PRS-CS and SBayesRC derived scores
-* Calculation of baseline PRS for weight change useing PRS-CS(x) derived score (_WIP_)
+* Calculation of baseline PRS for weight change using PRS-CS(x) derived score (_WIP_)
 * Calculation of baseline PRS for BMI using robustified set of SNPs from PRS-CS bootstrap
 * Calculation of performance metrics for all PRS versions
 
