@@ -32,6 +32,7 @@ cohort data also as PLINK BED files, either as a whole or per chromosome.
 ## Required software
 
 * [PLINK 1.90](https://www.cog-genomics.org/plink/)
+* [PLINK 2.00](https://www.cog-genomics.org/plink/2.0/) (for BGEN instead of BED input)
 * [R](https://www.r-project.org/)
 * [gdown](https://github.com/wkentaro/gdown) (optional)
 * [This](https://github.com/moulos-lab/better4u/blob/main/03_prs_derivation/evalfuns.R) set of R scripts
@@ -182,6 +183,13 @@ M_PRSCS_REC <- evalPrs(sanFile_PRSCS_REC,covFile,trait,genoBase)
 M_SBRC_TGP <- evalPrs(sanFile_SBRC_TGP,covFile,trait,genoBase)
 M_SBRC_UKB <- evalPrs(sanFile_SBRC_UKB,covFile,trait,genoBase)
 
+# Or if you have BGEN + SAMPLE file instead of PLINK files
+#M_PRSCS_ORG <- evalPrs(sanFile_PRSCS_ORG,covFile,trait,genoBase,bgen=TRUE)
+#M_PRSCS_ROB <- evalPrs(sanFile_PRSCS_ROB,covFile,trait,genoBase,bgen=TRUE)
+#M_PRSCS_REC <- evalPrs(sanFile_PRSCS_REC,covFile,trait,genoBase,bgen=TRUE)
+#M_SBRC_TGP <- evalPrs(sanFile_SBRC_TGP,covFile,trait,genoBase,bgen=TRUE)
+#M_SBRC_UKB <- evalPrs(sanFile_SBRC_UKB,covFile,trait,genoBase,bgen=TRUE)
+
 # PLINK files per chromosome - if required
 #M_PRSCS_ORG <- evalPrs(sanFile_PRSCS_ORG,covFile,trait,genoBase,
 #   perChr=TRUE,rc=0.2)
@@ -193,6 +201,18 @@ M_SBRC_UKB <- evalPrs(sanFile_SBRC_UKB,covFile,trait,genoBase)
 #   perChr=TRUE,rc=0.2)
 #M_SBRC_UKB <- evalPrs(sanFile_SBRC_UKB,covFile,trait,genoBase,
 #   perChr=TRUE,rc=0.2)
+
+# Or BGEN + SAMPLE files per chromosome - if required
+#M_PRSCS_ORG <- evalPrs(sanFile_PRSCS_ORG,covFile,trait,genoBase,
+#   bgen=TRUE,perChr=TRUE,rc=0.2)
+#M_PRSCS_ROB <- evalPrs(sanFile_PRSCS_ROB,covFile,trait,genoBase,
+#   bgen=TRUE,perChr=TRUE,rc=0.2)
+#M_PRSCS_REC <- evalPrs(sanFile_PRSCS_REC,covFile,trait,genoBase,
+#   bgen=TRUE,perChr=TRUE,rc=0.2)
+#M_SBRC_TGP <- evalPrs(sanFile_SBRC_TGP,covFile,trait,genoBase,
+#   bgen=TRUE,perChr=TRUE,rc=0.2)
+#M_SBRC_UKB <- evalPrs(sanFile_SBRC_UKB,covFile,trait,genoBase,
+#   bgen=TRUE,perChr=TRUE,rc=0.2)
 
 # Some additional values regarding coverage
 N_PRSCS_ORG <- as.numeric(countLines(prsFile_PRSCS_ORG)) - 1

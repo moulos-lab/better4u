@@ -262,10 +262,10 @@ sanitizePrs <- function(prsFile,genoBase,perChr=FALSE,chrs=seq(22),chrSep="_",
 # PRS file is firstly split and then calculations are made.
 # NOTE well that there are tiny differences (range -10e-6, 10e-6 for HUA) 
 # between the two approaches which are attributed to floating point rounds and
-# calculations.
+# calculations. plink2 now required for bgen input.
 evalPrs <- function(prsFile,covFile,trait,genoBase,perChr=FALSE,chrs=seq(22),
-    chrSep="_",iidCol=2,sum=TRUE,center=FALSE,plink=Sys.which("plink"),
-    rc=NULL) {
+    chrSep="_",iidCol=2,sum=TRUE,center=FALSE,bgen=FALSE,
+    plink=Sys.which("plink"),plink2=Sys.which("plink"),rc=NULL) {
     # Base name for plink score output
     prsName <- sub("\\.[^.]*$","",prsFile)
     
@@ -282,7 +282,12 @@ evalPrs <- function(prsFile,covFile,trait,genoBase,perChr=FALSE,chrs=seq(22),
     covars <- covars[complete.cases(covars),,drop=FALSE]
     
     # Align with genotypes
-    fam <- read.table(paste0(genoBase,".fam"))
+    if (bgen) {
+        fam <- read.table(paste0(genoBase,".sample"),header=TRUE)
+        fam <- fam[-1,,drop=FALSE]
+    }
+    else
+        fam <- read.table(paste0(genoBase,".fam"))
     rownames(fam) <- fam[,2]
     common <- intersect(rownames(fam),rownames(covars))
     # length(common) can be only smaller or equal to nrow(covars). If smaller, 
@@ -335,57 +340,113 @@ evalPrs <- function(prsFile,covFile,trait,genoBase,perChr=FALSE,chrs=seq(22),
         names(prsSplit) <- names(tmpSplit)
         
         # Now calculate scores per chromosome
-        scoreFiles <- unlist(cmclapply(chrs,function(chr) {
-            message("Calculating score with PLINK --score for ",chr)
-            bFile <- paste0(genoBase,chrSep,"chr",chr)
-            pFile <- prsSplit[chr]
-            o <- tempfile()
-            o <- paste0(o,"_prs_",chr)
-            args <- c("--bfile",bFile,"--score",pFile,"1 2 3 header",
-                ifelse(sum,"sum",""),ifelse(center,"center",""),"--out",o)
-            if (!is.null(remFile))
-                args <- c(args,"--remove",remFile)
-            args <- c(args,"--silent")
-            out <- tryCatch({
-                suppressWarnings(system2(plink,args=args))
-                TRUE
-            },error=function(e) {
-                message("Caught error: ",e$message)
-                return(FALSE)
-            },finally="")
-            return(paste0(o,".profile"))
-        },rc=rc))
+        if (bgen) {
+            scoreFiles <- unlist(cmclapply(chrs,function(chr) {
+                message("Calculating score with PLINK --score for ",chr)
+                bFile <- paste0(genoBase,chrSep,"chr",chr,".bgen")
+                pFile <- prsSplit[chr]
+                o <- tempfile()
+                o <- paste0(o,"_prs_",chr)
+                args <- c("--bgen",bFile,"--score",pFile,"1 2 3 header",
+                    ifelse(sum,"cols=fid,pheno1,nallele,denom,scoresums",
+                        "cols=fid,pheno1,nallele,denom,scoreavgs"),
+                ifelse(center,"center",""),"--out",o)
+                if (!is.null(remFile))
+                    args <- c(args,"--remove",remFile)
+                args <- c(args,"--silent")
+                out <- tryCatch({
+                    suppressWarnings(system2(plink2,args=args))
+                    TRUE
+                },error=function(e) {
+                    message("Caught error: ",e$message)
+                    return(FALSE)
+                },finally="")
+                return(paste0(o,".sscore"))
+            },rc=rc))
+        }
+        else {
+            scoreFiles <- unlist(cmclapply(chrs,function(chr) {
+                message("Calculating score with PLINK --score for ",chr)
+                bFile <- paste0(genoBase,chrSep,"chr",chr)
+                pFile <- prsSplit[chr]
+                o <- tempfile()
+                o <- paste0(o,"_prs_",chr)
+                args <- c("--bfile",bFile,"--score",pFile,"1 2 3 header",
+                    ifelse(sum,"sum",""),ifelse(center,"center",""),"--out",o)
+                if (!is.null(remFile))
+                    args <- c(args,"--remove",remFile)
+                args <- c(args,"--silent")
+                out <- tryCatch({
+                    suppressWarnings(system2(plink,args=args))
+                    TRUE
+                },error=function(e) {
+                    message("Caught error: ",e$message)
+                    return(FALSE)
+                },finally="")
+                return(paste0(o,".profile"))
+            },rc=rc))
+        }
         
         # Then somehow read and combine... essentially for the individuals
         # (row) add #chrs columns and create a data frame with one col SCORE
+        scoreCol <- ifelse(bgen,ifelse(sum,"SCORE1_SUM","SCORE1_AVG"),
+            ifelse(sum,"SCORESUM","SCORE"))
+        cc <- ifelse(bgen,"","#")
         chrScores <- cmclapply(scoreFiles,function(f) {
-            tmpScore <- read.table(f,row.names=2,header=TRUE)
-            return(tmpScore[,"SCORESUM",drop=FALSE])
+            tmpScore <- read.table(f,row.names=2,header=TRUE,comment.char=cc)
+            return(tmpScore[,scoreCol,drop=FALSE])
         })
         chrScores <- do.call("cbind",chrScores)
         theScore <- data.frame(SCORE=rowSums(chrScores))
     }
     else {
         #message("Calculating score with PLINK --score")
-        args <- c("--bfile",genoBase,"--score",prsFile,"1 2 3 header",
-            ifelse(sum,"sum",""),ifelse(center,"center",""),"--out",prsName)
-        if (!is.null(remFile))
-            args <- c(args,"--remove",remFile)
-        args <- c(args,"--silent")
-        out <- tryCatch({
-            suppressWarnings(system2(plink,args=args))
-            TRUE
-        },error=function(e) {
-            message("Caught error: ",e$message)
-            return(FALSE)
-        },finally="")
+        if (bgen) {
+            bgenFile <- paste0(genoBase,".bgen")
+            args <- c("--bgen",bgenFile,"--score",prsFile,"1 2 3 header",
+                ifelse(sum,"cols=fid,pheno1,nallele,denom,scoresums",
+                    "cols=fid,pheno1,nallele,denom,scoreavgs"),
+                ifelse(center,"center",""),"--out",prsName)
+            if (!is.null(remFile))
+                args <- c(args,"--remove",remFile)
+            args <- c(args,"--silent")
+            out <- tryCatch({
+                suppressWarnings(system2(plink2,args=args))
+                TRUE
+            },error=function(e) {
+                message("Caught error: ",e$message)
+                return(FALSE)
+            },finally="")
 
-        if (!out)
-            stop("Failed to generate score file! Exiting...")
-        
-        # If all ok, read the score file
-        scoreFile <- paste0(prsName,".profile")
-        theScore <- read.table(scoreFile,row.names=2,header=TRUE)
+            if (!out)
+                stop("Failed to generate score file! Exiting...")
+            
+            # If all ok, read the score file
+            scoreFile <- paste0(prsName,".sscore")
+            theScore <- read.table(scoreFile,row.names=2,header=TRUE,
+                comment.char="")
+        }
+        else {
+            args <- c("--bfile",genoBase,"--score",prsFile,"1 2 3 header",
+                ifelse(sum,"sum",""),ifelse(center,"center",""),"--out",prsName)
+            if (!is.null(remFile))
+                args <- c(args,"--remove",remFile)
+            args <- c(args,"--silent")
+            out <- tryCatch({
+                suppressWarnings(system2(plink2,args=args))
+                TRUE
+            },error=function(e) {
+                message("Caught error: ",e$message)
+                return(FALSE)
+            },finally="")
+
+            if (!out)
+                stop("Failed to generate score file! Exiting...")
+            
+            # If all ok, read the score file
+            scoreFile <- paste0(prsName,".profile")
+            theScore <- read.table(scoreFile,row.names=2,header=TRUE)
+        }
     }
         
     # ...and prepare metrics, regressions

@@ -1997,3 +1997,29 @@ do
   cat b4u_tgp_prscs_pst_eff_a1_b0.5_phiauto_chr${i}.txt
 done > b4u_tgp_prscs_pst_eff_a1_b0.5_phiauto.txt
 ```
+
+13. Converstion to BGEN format
+
+Genome-wide:
+
+```
+plink2 --bfile COHORT --export bgen-1.2 --out COHORT
+```
+
+Chromosome-wise:
+
+```
+for CHR in $(seq 1 22); 
+do
+  plink2 --bfile COHORT_chr${CHR} --export bgen-1.2 --out COHORT_chr${CHR} &
+done
+```
+
+PRS calculation
+
+```
+plink2 \
+  --bgen COHORT.bgen ref-last \
+  --score b4u_bmi_prscs_original.prs.san 1 2 3 header  cols=fid,pheno1,nallele,scoresums \
+  --out testbgen
+```
