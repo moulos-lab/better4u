@@ -265,7 +265,7 @@ sanitizePrs <- function(prsFile,genoBase,perChr=FALSE,chrs=seq(22),chrSep="_",
 # calculations. plink2 now required for bgen input.
 evalPrs <- function(prsFile,covFile,trait,genoBase,perChr=FALSE,chrs=seq(22),
     chrSep="_",iidCol=2,sum=TRUE,center=FALSE,bgen=FALSE,
-    plink=Sys.which("plink"),plink2=Sys.which("plink"),rc=NULL) {
+    plink=Sys.which("plink"),plink2=Sys.which("plink2"),rc=NULL) {
     # Base name for plink score output
     prsName <- sub("\\.[^.]*$","",prsFile)
     
@@ -347,7 +347,8 @@ evalPrs <- function(prsFile,covFile,trait,genoBase,perChr=FALSE,chrs=seq(22),
                 pFile <- prsSplit[chr]
                 o <- tempfile()
                 o <- paste0(o,"_prs_",chr)
-                args <- c("--bgen",bFile,"--score",pFile,"1 2 3 header",
+                args <- c("--bgen",bFile,"ref-unknown --score",
+                    pFile,"1 2 3 header",
                     ifelse(sum,"cols=fid,pheno1,nallele,denom,scoresums",
                         "cols=fid,pheno1,nallele,denom,scoreavgs"),
                 ifelse(center,"center",""),"--out",o)
@@ -403,7 +404,8 @@ evalPrs <- function(prsFile,covFile,trait,genoBase,perChr=FALSE,chrs=seq(22),
         #message("Calculating score with PLINK --score")
         if (bgen) {
             bgenFile <- paste0(genoBase,".bgen")
-            args <- c("--bgen",bgenFile,"--score",prsFile,"1 2 3 header",
+            args <- c("--bgen",bgenFile,"ref-unknown --score",
+                prsFile,"1 2 3 header",
                 ifelse(sum,"cols=fid,pheno1,nallele,denom,scoresums",
                     "cols=fid,pheno1,nallele,denom,scoreavgs"),
                 ifelse(center,"center",""),"--out",prsName)
