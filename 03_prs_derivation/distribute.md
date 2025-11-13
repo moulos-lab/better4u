@@ -274,12 +274,26 @@ tar -czvf $SITE".tar.gz" b4u_bmi_prs_*.txt
 
 Upload the file `SITE.tar.gz` [here](https://drive.google.com/drive/folders/1q3Vl0mfvJt4TXKCJUo4KU7vGiaFo0iCj?usp=drive_link)
 
-Thank you!
+In addition, we would like you to upload the following information regarding the
+matched individuals alsi with genetic data used in GWAS and this analysis in a 
+separate text file called `SITE_meta.txt`:
 
-**Important note**: There are tiny differences (range -10e-6, 10e-6 for HUA) 
-between the two approaches (single file vs chromosome-wise files) when 
-calculating PRS with PLINK. These differences are attributed to floating point 
-rounds and the order of calculations in PLINK. In any case, these differences
-should not have any significant impact in actual PRS calculations or genetic
-risk.
+- Number of males and females
+- Mean and median BMI for all individuals as well as males and females 
+separately
+- Standard deviation and Interquartile Range (IQR) of BMI  for all individuals 
+as well as males and females separately
+- Mean and median Age for all individuals as well as males and females 
+separately
+- Standard deviation and Interquartile Range (IQR) of Age for all individuals 
+as well as males and females separately
 
+**Thank you in advance**
+
+### Important note
+
+There are tiny differences (range -10e-6, 10e-6 for HUA) between the two 
+approaches (single file vs chromosome-wise files) when calculating PRS with 
+PLINK. These differences are attributed to floating point rounds and the order 
+of calculations in PLINK. In any case, these differences should not have any
+significant impact in actual PRS calculations or genetic risk.
