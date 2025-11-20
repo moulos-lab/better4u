@@ -915,7 +915,7 @@ Rscript \
 
 ### Baseline PRS with PRS-CS and 1000 genomes EUR population LD
 
-PRS-CS requires a PLINK BIM file for the variants in the validation populatyion.
+PRS-CS requires a PLINK BIM file for the variants in the validation population.
 BED files are not required as PRS-CS can operate on summary statistics. In this
 case the BIM file is used for overlap with the 1000 genomes LD. We make sure 
 that the BIM file lives on its own:
@@ -933,7 +933,8 @@ to use `nohup`:
 # --n_gwas can be the median METAL sample size
 nohup python $WORKSPACE/resources/PRScs/PRScs.py \
   --ref_dir=$WORKSPACE/resources/PRScsxLD/ldblk_1kg_eur \
-  --bim_prefix=$WORKSPACE/work/HUABB/only_bim/HUA_unrelated_dbsnp \
+  #--bim_prefix=$WORKSPACE/work/HUABB/only_bim/HUA_unrelated_dbsnp \
+  --bim_prefix=$WORKSPACE/work/METAL/metal_b4u \
   --sst_file=$WORKSPACE/work/METAL/metal_b4u.csx \
   --n_gwas=232593 \
   --out_dir=$WORKSPACE/work/PRS/baseline/b4u_tgp_prscs \
@@ -1713,6 +1714,395 @@ prePrsFile <- file.path(WORKSPACE,"work","PRS","final",
 prsFile <- file.path(DISTSPACE,"b4u_bmi_prscs_recalibrated.prs")
 prsFile <- formatPrs(prePrsFile,prsFile,from="prscs")
 ```
+
+## Weight change
+
+The process for weight change is essentially the same. The key difference is 
+that we now have two files of summary statistics instead of one so we cannot use
+SBayesRC. For simplicity, we move completed work regarding baseline PRS to
+`$WORKSPACE/BMI` and we repeat the above process (applicable steps) with the
+same commands and `$WORKSPACE` as the main path.
+
+Below, we outline only the steps that substantially differ between the two runs:
+
+### Conversion of METAL to COJO
+
+```
+METAL format in weight change
+CHR   POS SNP A1 A2 N   AF  SE  log10_P Z
+
+COJO format
+SNP   A1  A2  freq    b   se  p   N
+```
+
+The following R script will produce COJO versions of the METAL output:
+
+```bash
+cd $WORKSPACE/work/METAL
+```
+
+and then, write COJO format for each chromosome and genome-wide:
+
+```r
+Rscript \
+  -e '{
+    # Intialize output list
+    cojoList <- vector("list",22)
+    
+    # Read files
+    for (chr in seq(1,22)) {
+        # METAL output filename
+        mf <- paste0("Weight_slope.alt.chr",chr,".txt")
+        
+        message("Reading ",mf)
+        mstats <- read.delim(mf)
+        
+        # Intermediate variables
+        # Genotype variance (for allele frequencyf=AF)
+        varG <- 2 * mstats$AF * (1 - mstats$AF)
+        # Denominator sqrt(N*varG)
+        den <- sqrt(mstats$N * varG)
+        # Standardized scale (per-SD phenotype, per-SD genotype)
+        SE_sd <- 1/den
+        BETA_sd <- mstats$Z * SE_sd
+        
+        # Assemble and write COJO file per chromosome
+        cojoList[[chr]] <- data.frame(
+            SNP=mstats$SNP,
+            A1=mstats$ALT,
+            A2=mstats$REF,
+            freq=mstats$AF,
+            b=BETA_sd/sqrt(varG),
+            se=SE_sd/sqrt(varG),
+            p=10^-mstats$log10_P,
+            N=round(mstats$N)
+        )
+        write.table(cojoList[[chr]],file=paste0("metal_b4u_chr",chr,".ma"),
+            sep="\t",quote=FALSE,row.names=FALSE)
+    }
+    
+    # All chromosomes
+    cojos <- do.call("rbind",cojoList)
+    write.table(cojos,file="metal_b4u.ma",sep="\t",quote=FALSE,row.names=FALSE)
+  }'
+```
+
+### Weight change PRS with GCTB and 1000 genomes EUR population LD
+
+The QC step in GCTB SBayesRC is fixed and uses only _N_.
+
+1. The QC and imputation steps can be done in one script as with 1000 genomes
+data, not much time is required:
+
+```bash
+THREADS=32
+
+gctb \
+  --ldm-eigen $WORKSPACE/resources/EUR_LD \
+  --gwas-summary $WORKSPACE/work/METAL/metal_b4u.ma \
+  --impute-summary \
+  --out $WORKSPACE/work/PRS/baseline/b4u_tgp_gctb \
+  --thread $THREADS
+```
+
+2. With 1000 genomes EUR LD, some SNPs are missing from the functional 
+annotations and if we don't fix, error occurs.
+
+```bash
+Rscript \
+  -e '{
+    WORKSPACE <- Sys.getenv("WORKSPACE")
+
+    ref <- read.delim(file.path(WORKSPACE,"resources","annot_snps.txt"))
+    gwa <- read.table(file.path(WORKSPACE,"work","PRS","baseline",
+        "b4u_tgp_gctb.imputed.ma"),header=TRUE)
+    reqs <- setdiff(gwa$SNP,ref$SNP)
+    tmp <- read.delim(file.path(WORKSPACE,"resources","annot_baseline2.2.txt"),
+        nrow=5)
+    out <- matrix(0,nrow=length(reqs),ncol=ncol(tmp)-1)
+    colnames(out) <- names(tmp)[2:ncol(tmp)]
+    out[,1] <- 1
+    out <- data.frame(reqs,out)
+    names(out)[1] <- "SNP"
+    write.table(out,file=file.path(WORKSPACE,"resources","annot_add_wc.txt"),
+        quote=FALSE,sep="\t",row.names=FALSE,col.names=FALSE)
+  }'
+
+cat $WORKSPACE/resources/annot_baseline2.2.txt $WORKSPACE/resources/annot_add_wc.txt \
+ > $WORKSPACE/resources/annot_expanded_wc.txt
+```
+
+3. GCTB SBayesRC (tuning, MCMC iterations and effect estimations) is now ready 
+to run (<1h)
+
+```bash
+gctb \
+  --ldm-eigen $WORKSPACE/resources/EUR_LD \
+  --gwas-summary $WORKSPACE/work/PRS/baseline/b4u_tgp_gctb.imputed.ma \
+  --sbayes RC \
+  --annot $WORKSPACE/resources/annot_expanded_wc.txt \
+  --out $WORKSPACE/work/PRS/baseline/b4u_tgp_gctb \
+  --thread $THREADS
+```
+
+### Weight change PRS with GCTB and built-in LD
+
+The QC step in GCTB SBayesRC is fixed and uses only _N_.
+
+1. The QC and imputation steps can be done in one script as with 1000 genomes
+data, not much time is required:
+
+```bash
+THREADS=32
+
+gctb \
+  --ldm-eigen $WORKSPACE/resources/ukbEUR_Imputed \
+  --gwas-summary $WORKSPACE/work/METAL/metal_b4u.ma \
+  --impute-summary \
+  --out $WORKSPACE/work/PRS/baseline/b4u_ukb_gctb \
+  --thread $THREADS
+```
+
+2. GCTB SBayesRC (tuning, MCMC iterations and effect estimations) is now ready 
+to run (requires ~6-7h, better with `nohup`)
+
+```bash
+nohup gctb \
+  --ldm-eigen $WORKSPACE/resources/ukbEUR_Imputed \
+  --gwas-summary $WORKSPACE/work/PRS/baseline/b4u_ukb_gctb.imputed.ma \
+  --sbayes RC \
+  --annot $WORKSPACE/resources/annot_baseline2.2.txt \
+  --out $WORKSPACE/work/PRS/baseline/b4u_ukb_gctb \
+  --thread $THREADS \
+  > $WORKSPACE/work/PRS/baseline/b4u_ukb_gctb.log 2>&1 &
+```
+
+### Conversion of METAL to PRS-CS expected format
+
+PRS-CS works with the following summary statistics format:
+
+```
+METAL format
+CHR   POS SNP REF ALT N   AF  SE  log10_P Z
+
+PRS-CSx format
+SNP          A1   A2   BETA      SE
+```
+
+The following R script will produce PRS-CSx versions of the METAL output. The
+same assumptions regarding METAL output and betas, SEs as in the case of 
+SBayesRC COJO files apply:
+
+```bash
+cd $WORKSPACE/work/METAL
+```
+
+and then, write PRS-CS format for each chromosome and genome-wide:
+
+```r
+Rscript \
+  -e '{
+    # Intialize output list
+    prscxList <- bimList <- vector("list",22)
+    
+    # Read files and convert
+    for (chr in seq(1,22)) {
+        # METAL output filename
+        mf <- paste0("Weight_slope.alt.chr",chr,".txt")
+        
+        message("Reading ",mf)
+        mstats <- read.delim(mf)
+        
+        # Intermediate variables
+        # Genotype variance (for allele frequencyf=AF)
+        varG <- 2 * mstats$AF * (1 - mstats$AF)
+        # Denominator sqrt(N*varG)
+        den <- sqrt(mstats$N * varG)
+        # Standardized scale (per-SD phenotype, per-SD genotype)
+        SE_sd <- 1/den
+        BETA_sd <- mstats$Z * SE_sd
+        
+        # Assemble and write PRS-CS files per chromosome
+        prscxList[[chr]] <- data.frame(
+            SNP=mstats$SNP,
+            A1=mstats$ALT,
+            A2=mstats$REF,
+            BETA=BETA_sd/sqrt(varG),
+            SE=SE_sd/sqrt(varG),
+            p=10^-mstats$log10_P,
+            N=round(mstats$N)
+        )
+        write.table(prscxList[[chr]],file=paste0("metal_b4u_chr",chr,".csx"),
+            sep="\t",quote=FALSE,row.names=FALSE)
+        
+        # Also a BIM right out of METAL output
+        bimList[[chr]] <- data.frame(
+            CHR=mstats$CHR,
+            ID=mstats$SNP,
+            CM=0,
+            POS=mstats$POS,
+            A1=mstats$ALT,
+            A2=mstats$REF
+        )
+    }
+    
+    # All chromosomes
+    prscxs <- do.call("rbind",prscxList)
+    write.table(prscxs,file="metal_b4u.csx",sep="\t",quote=FALSE,
+        row.names=FALSE)
+    
+    # BIM for PRS-CS
+    bims <- do.call("rbind",bimList)
+    write.table(bims,file="metal_b4u.bim",sep="\t",quote=FALSE,
+        row.names=FALSE,col.names=FALSE)
+  }'
+```
+
+### Baseline PRS with PRS-CS and 1000 genomes EUR population LD
+
+PRS-CS runs in a single step. It may take some time to complete, so it's better
+to use `nohup`:
+
+```bash
+N_THREADS=24
+
+export OMP_NUM_THREADS=$N_THREADS
+export OPENBLAS_NUM_THREADS=$N_THREADS
+export MKL_NUM_THREADS=$N_THREADS
+export NUMEXPR_NUM_THREADS=$N_THREADS
+
+# --n_gwas can be the median METAL sample size
+nohup python $WORKSPACE/resources/PRScs/PRScs.py \
+  --ref_dir=$WORKSPACE/resources/PRScsxLD/ldblk_1kg_eur \
+  --bim_prefix=$WORKSPACE/work/METAL/metal_b4u \
+  --sst_file=$WORKSPACE/work/METAL/metal_b4u.csx \
+  --n_gwas=61432 \
+  --out_dir=$WORKSPACE/work/PRS/baseline/b4u_tgp_prscs \
+  > $WORKSPACE/work/PRS/baseline/b4u_tgp_prscs.log 2>&1 &
+```
+
+Then simply concatenate the per chromosome results:
+
+```bash
+cd $WORKSPACE/work/PRS/baseline
+for i in {1..22}; 
+do
+  cat b4u_tgp_prscs_pst_eff_a1_b0.5_phiauto_chr${i}.txt
+done > b4u_tgp_prscs_pst_eff_a1_b0.5_phiauto.txt
+```
+
+### Generation of perturbed summary statistics for weight change
+
+The file `$WORKSPACE/work/METAL/metal_b4u.csx` contains the meta-analysis
+summary statistics in PRS-CS format. We will use betas and SEs in this file to
+generate pertrurbed summary statistics. The following script will introduce 
+noise in betas within the acceptable CIs. The process will be repeated 1000
+times to generate 1000 perturbed datasets.
+
+```r
+WORKSPACE <- Sys.getenv("WORKSPACE")
+
+source(file.path(WORKSPACE,"resources","better4u","03_prs_derivation",
+    "evalfuns.R"))
+
+# Read in summary statistics
+gwas <- read.delim(file.path(WORKSPACE,"work","METAL","metal_b4u.csx"))
+
+# betas and ses
+beta <- gwas$BETA
+SE   <- gwas$SE
+
+# Estimate λ for 95% CI
+lambda_ci95 <- findLambda(targetProb=0.95,zLimit=1.96)
+# Note: for 95% within 95% CI, lambda will be ~1.0.
+
+# Bootstrap 1000 times
+set.seed(42)
+#perturbed <- perturbBetas(beta,SE,lambda=lambda_ci95)
+perturbed <- perturbBetas(beta,SE,lambda=lambda_ci95,N=100)
+
+## Save the pertubed betas
+## save(perturbed,file=file.path(WORKSPACE,"work","PRS","baseline",
+##  "perturbed.rda"))
+
+# Create 1000 PRS-CS summary statistics files
+iterString <- sprintf("%04d", 1:1000)
+cmclapply(seq(ncol(perturbed)),function(j) {
+    message("Writing perturbed beta iteration ",j)
+    
+    # Prepare the data frame
+    tmpcs <- gwas
+    tmpcs$p <- NULL
+    tmpcs$BETA <- perturbed[,j]
+    
+    # Write it to the appropriate place
+    outPath <- file.path(WORKSPACE,"work","PRS","bootstrap",iterString[j])
+    dir.create(outPath,recursive=TRUE,showWarnings=FALSE)
+    write.table(tmpcs,file=file.path(outPath,"metal_b4u_sim.csx"),sep="\t",
+        quote=FALSE,row.names=FALSE)
+},rc=1)
+```
+
+### Running PRS-CS with boostraped summary statistics for weight change
+
+We are going to use GNU `parallel` for our purposes. Based on our setup, the
+following script will execute PRS-CS 1000 times. It should be put in a `.sh` 
+file, e.g. `run_prscx_bootstrap.sh`. The threads reflect the availability in our
+system (56 cores, ~480GB RAM). Each iteration uses 4 cores for MCMC and the
+bootstrap is executed in 14 concurrent jobs.
+
+```bash
+#!/bin/bash
+
+# Allow job control
+set -m
+
+# Kill children on exit
+trap "echo 'Stopping...'; pkill -P $$" SIGINT SIGTERM EXIT
+
+export WORKSPACE=/media/storage3/playground/b4uprs
+
+N_THREADS=4
+
+export OMP_NUM_THREADS=$N_THREADS
+export OPENBLAS_NUM_THREADS=$N_THREADS
+export MKL_NUM_THREADS=$N_THREADS
+export NUMEXPR_NUM_THREADS=$N_THREADS
+
+JOBS=14
+
+# Run
+parallel -j ${JOBS} '
+  ITER={}
+  echo "Running iteration $ITER"
+
+  python $WORKSPACE/resources/PRScs/PRScs.py \
+    --ref_dir=$WORKSPACE/resources/PRScsxLD/ldblk_1kg_eur \
+    --bim_prefix=$WORKSPACE/METAL/metal_b4u \
+    --sst_file=$WORKSPACE/work/PRS/bootstrap/{}/metal_b4u_sim.csx \
+    --n_gwas=61432 \
+    --out_dir=$WORKSPACE/work/PRS/bootstrap/{}/b4u_tgp_prscs_sim \
+    > $WORKSPACE/work/PRS/bootstrap/{}/run.log 2>&1
+' ::: $(printf "%04d " {1..1000})
+
+# Wait for all PRS-CS runs to finish
+wait
+
+# Merge
+parallel -j ${JOBS} '
+  for CHR in $(seq 1 22); 
+  do
+    cat $WORKSPACE/work/PRS/bootstrap/{}/b4u_tgp_prscs_sim_pst_eff_a1_b0.5_phiauto_chr${CHR}.txt
+  done > $WORKSPACE/work/PRS/bootstrap/{}/b4u_tgp_prscs_sim_pst_eff_a1_b0.5_phiauto.txt
+' ::: $(printf "%04d " {1..1000})
+```
+
+Then we run it:
+
+```bash
+nohup bash run_prscs_bootstrap.sh > bootstrap.log &
+```
+
 
 #### Notes
 
