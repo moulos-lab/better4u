@@ -331,7 +331,7 @@ evalPrs <- function(prsFile,covFile,trait,genoBase,perChr=FALSE,chrs=seq(22),
     chrSep="_",iidCol=2,sum=TRUE,center=FALSE,bgen=FALSE,
     plink=Sys.which("plink"),plink2=Sys.which("plink2"),rc=NULL) {
     # Determine plink version(s) to use and for what purpose
-    proceed <- .informAboutPlinkVersions(plink,plink2)
+    proceed <- .informAboutPlinkVersions(plink,plink2,bgen)
     if (!proceed) return()
     
     # Base name for plink score output
@@ -692,7 +692,7 @@ cmclapply <- function(...,rc) {
   ))
 }
 
-.informAboutPlinkVersions <- function(plink,plink2) {
+.informAboutPlinkVersions <- function(plink,plink2,bgen) {
     if (is.character(plink) && file.exists(plink) 
         && is.character(plink2) && file.exists(plink2)) {
         message("Both plink 1.9 and plink 2.0 are found on the system.")
