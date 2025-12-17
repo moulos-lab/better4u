@@ -72,7 +72,6 @@ mkdir -p $WORKSPACE/work/PRS/baseline
 mkdir -p $WORKSPACE/work/PRS/bootstrap
 mkdir -p $WORKSPACE/work/PRS/final
 mkdir -p $WORKSPACE/work/PRS/distribute
-#mkdir -p $WORKSPACE/work/LOO
 ```
 
 ### SBayesRC
@@ -2018,8 +2017,7 @@ lambda_ci95 <- findLambda(targetProb=0.95,zLimit=1.96)
 
 # Bootstrap 1000 times
 set.seed(42)
-#perturbed <- perturbBetas(beta,SE,lambda=lambda_ci95)
-perturbed <- perturbBetas(beta,SE,lambda=lambda_ci95,N=100)
+perturbed <- perturbBetas(beta,SE,lambda=lambda_ci95,N=1000)
 
 ## Save the pertubed betas
 ## save(perturbed,file=file.path(WORKSPACE,"work","PRS","baseline",
@@ -2103,8 +2101,493 @@ Then we run it:
 nohup bash run_prscs_bootstrap.sh > bootstrap.log &
 ```
 
+## Leave-One-Out analysis for BETTER4U PRS cohorts
 
-#### Notes
+In this section, we perform several analyses related to the study of effects
+when RRS is/are calculated while leaving out cohorts. The main plan is:
+
+1. Preprocess all the leave-out summary statistics to prepare for PRS derivation
+with SBayesRC TGP, SBayesRC UKB and PRS-CS.
+2. For each preprocessed dataset, create 3 PRS versions (no robust approach)
+3. Calculate various metrics based only on PRS betas, maybe coupled with SS
+
+*NOTE*: To really evaluate step (2), we would have to distribute the PRS 
+versions to the left-out study partner and gather evaluations. One metric that
+could be calculated this way is the level of contribution of each cohort. I.e.:
+- UTARTU is left out and PRS is calculated with all others, we measure 
+PRS R<sup>2</sup> on UTARTU
+- VUA is left out and PRS is calculated with all others, we measure 
+PRS R<sup>2</sup> on VUA
+If R<sup>2</sup> of VUA > PRS R<sup>2</sup> UTARTU, UTARTU has more effect in
+summary statistics?
+In this way we can rank contributions according to left-out studies?
+
+```
+mkdir -p $WORKSPACE/work/BMI/LOO & cd $WORKSPACE/work/BMI/LOO
+
+mkdir -p BIB_out/METAL BIONIC_out/METAL HMGU_out/METAL HUA_out/METAL \
+  MUW_out/METAL TAUH_out/METAL UH_out/METAL UTARTU_out/METAL VUA_out/METAL
+
+# Place there the files received by Anders Erikkson
+```
+
+### Conversion of METAL to COJO
+
+SBayesRC works with a summary statistics format supported by the parent package
+GCTB called COJO:
+
+```
+METAL format
+CHR   POS SNP REF ALT N   AF  SE  log10_P Z
+
+COJO format
+SNP   A1  A2  freq    b   se  p   N
+```
+
+The following R script will produce COJO versions of the METAL output:
+
+```bash
+cd $WORKSPACE/work/BMI/LOO
+```
+
+and then, write COJO format for each chromosome and genome-wide:
+
+```r
+Rscript \
+  -e '{
+    for (looD in dir()) {
+        message("Processing ",looD)
+        
+        # Intialize output list
+        cojoList <- vector("list",22)
+        
+        # Read files
+        for (chr in seq(1,22)) {
+            # METAL output filename
+            mf <- file.path(looD,"METAL",paste0("metal.chr",chr,".txt"))
+            
+            message("  Reading ",mf)
+            mstats <- read.delim(mf)
+            
+            # Intermediate variables
+            # Genotype variance (for allele frequencyf=AF)
+            varG <- 2 * mstats$AF * (1 - mstats$AF)
+            # Denominator sqrt(N*varG)
+            den <- sqrt(mstats$N * varG)
+            # Standardized scale (per-SD phenotype, per-SD genotype)
+            SE_sd <- 1/den
+            BETA_sd <- mstats$Z * SE_sd
+            
+            # Assemble and write COJO file per chromosome
+            cojoList[[chr]] <- data.frame(
+                SNP=mstats$SNP,
+                A1=mstats$ALT,
+                A2=mstats$REF,
+                freq=mstats$AF,
+                b=BETA_sd/sqrt(varG),
+                se=SE_sd/sqrt(varG),
+                p=10^-mstats$log10_P,
+                N=round(mstats$N)
+            )
+            write.table(cojoList[[chr]],
+                file=file.path(looD,"METAL",paste0("metal_b4u_chr",chr,".ma")),
+                sep="\t",quote=FALSE,row.names=FALSE)
+        }
+        
+        # All chromosomes
+        cojos <- do.call("rbind",cojoList)
+        write.table(cojos,file=file.path(looD,"METAL","metal_b4u.ma"),sep="\t",
+            quote=FALSE,row.names=FALSE)
+    }
+  }'
+```
+
+### Conversion of METAL to PRS-CS expected format
+
+PRS-CS works with the following summary statistics format:
+
+```
+METAL format
+CHR   POS SNP REF ALT N   AF  SE  log10_P Z
+
+PRS-CSx format
+SNP          A1   A2   BETA      SE
+```
+
+The following R script will produce PRS-CS versions of the METAL output. The
+same assumptions regarding METAL output and betas, SEs as in the case of 
+SBayesRC COJO files apply:
+
+```bash
+cd $WORKSPACE/work/BMI/LOO
+```
+
+and then, write PRS-CS format for each chromosome and genome-wide:
+
+```r
+Rscript \
+  -e '{
+    for (looD in dir()) {
+        message("Processing ",looD)
+        
+        # Intialize output list
+        prscxList <- bimList <- vector("list",22)
+        
+        # Read files and convert
+        for (chr in seq(1,22)) {
+            # METAL output filename
+            mf <- file.path(looD,"METAL",paste0("metal.chr",chr,".txt"))
+            
+            message("  Reading ",mf)
+            mstats <- read.delim(mf)
+            
+            # Intermediate variables
+            # Genotype variance (for allele frequencyf=AF)
+            varG <- 2 * mstats$AF * (1 - mstats$AF)
+            # Denominator sqrt(N*varG)
+            den <- sqrt(mstats$N * varG)
+            # Standardized scale (per-SD phenotype, per-SD genotype)
+            SE_sd <- 1/den
+            BETA_sd <- mstats$Z * SE_sd
+            
+            # Assemble and write PRS-CS files per chromosome
+            prscxList[[chr]] <- data.frame(
+                SNP=mstats$SNP,
+                A1=mstats$ALT,
+                A2=mstats$REF,
+                BETA=BETA_sd/sqrt(varG),
+                SE=SE_sd/sqrt(varG),
+                p=10^-mstats$log10_P,
+                N=round(mstats$N)
+            )
+            
+            # There are some missing betas...
+            if (any(is.na(prscxList[[chr]]$BETA)))
+                prscxList[[chr]] <- 
+                    prscxList[[chr]][-which(is.na(prscxList[[chr]]$BETA)),,
+                        drop=FALSE]
+            
+            write.table(prscxList[[chr]],
+                file=file.path(looD,"METAL",paste0("metal_b4u_chr",chr,".csx")),
+                sep="\t",quote=FALSE,row.names=FALSE)
+            
+            # Also a BIM right out of METAL output
+            bimList[[chr]] <- data.frame(
+                CHR=mstats$CHR,
+                ID=mstats$SNP,
+                CM=0,
+                POS=mstats$POS,
+                A1=mstats$ALT,
+                A2=mstats$REF
+            )
+        }
+        
+        # All chromosomes
+        prscxs <- do.call("rbind",prscxList)
+        write.table(prscxs,file=file.path(looD,"METAL","metal_b4u.csx"),
+            sep="\t",quote=FALSE,row.names=FALSE)
+        
+        # BIM for PRS-CS
+        bims <- do.call("rbind",bimList)
+        write.table(bims,file=file.path(looD,"METAL","metal_b4u.bim"),sep="\t",
+            quote=FALSE,row.names=FALSE,col.names=FALSE)
+    }
+  }'
+```
+
+### Baseline PRS with GCTB and 1000 genomes EUR population LD
+
+The steps as described before are:
+
+1. QC and imputation steps with 1000 genomes data
+2. Fix annotation for 1000 genomes EUR LD
+3. GCTB SBayesRC (tuning, MCMC iterations and effect estimations)
+
+As we are processing multiple summary statistics, we combine all steps in one
+script to run on the background.
+
+```bash
+mkdir -p $WORKSPACE/work/scripts && cd $WORKSPACE/work/scripts
+
+cat > run_loo_gctb_tgp.sh << 'EOF'
+#!/bin/bash
+
+export GCTB=`which gctb`
+export RSCRIPT=`which Rscript`
+
+export THREADS=32
+
+export WORKSPACE=/media/storage3/playground/b4uprs
+export WORKPATH=$WORKSPACE/work/BMI/LOO
+
+for DIR in `ls $WORKPATH`
+do
+
+    echo "========== Processing $DIR"
+    echo "==========  Step 1: Preprocessing"
+
+    mkdir -p $WORKPATH/$DIR/PRS
+    export LOCALDIR=$WORKPATH/$DIR/PRS
+    
+    $GCTB \
+      --ldm-eigen $WORKSPACE/resources/EUR_LD \
+      --gwas-summary $WORKPATH/$DIR/METAL/metal_b4u.ma \
+      --impute-summary \
+      --out $LOCALDIR/b4u_tgp_gctb \
+      --thread $THREADS
+
+    echo "==========  Step 2: Fixing annotation"
+
+    cut -f1 $WORKSPACE/resources/annot_baseline2.2.txt \
+        > $LOCALDIR/annot_snps.txt
+
+    $RSCRIPT \
+      -e '{
+        WORKSPACE <- Sys.getenv("WORKSPACE")
+        LOCALDIR <- Sys.getenv("LOCALDIR")
+
+        ref <- read.delim(file.path(LOCALDIR,"annot_snps.txt"))
+        gwa <- read.table(file.path(LOCALDIR,"b4u_tgp_gctb.imputed.ma"),
+            header=TRUE)
+        reqs <- setdiff(gwa$SNP,ref$SNP)
+        tmp <- read.delim(file.path(WORKSPACE,"resources",
+            "annot_baseline2.2.txt"),nrow=5)
+        out <- matrix(0,nrow=length(reqs),ncol=ncol(tmp)-1)
+        colnames(out) <- names(tmp)[2:ncol(tmp)]
+        out[,1] <- 1
+        out <- data.frame(reqs,out)
+        names(out)[1] <- "SNP"
+        write.table(out,file=file.path(LOCALDIR,"annot_add.txt"),quote=FALSE,
+            sep="\t",row.names=FALSE,col.names=FALSE)
+    }'
+
+    cat $WORKSPACE/resources/annot_baseline2.2.txt $LOCALDIR/annot_add.txt \
+        > $LOCALDIR/annot_expanded.txt
+
+    echo "==========  Step 3: PRS derivation"
+
+    $GCTB \
+      --ldm-eigen $WORKSPACE/resources/EUR_LD \
+      --gwas-summary $LOCALDIR/b4u_tgp_gctb.imputed.ma \
+      --sbayes RC \
+      --annot $LOCALDIR/annot_expanded.txt \
+      --out $LOCALDIR/b4u_tgp_gctb \
+      --thread $THREADS
+
+done
+EOF
+
+nohup bash run_loo_gctb_tgp.sh > run_loo_gctb_tgp.log &
+```
+
+### Baseline PRS with GCTB and built-in LD
+
+The steps as described before are:
+
+1. QC and imputation steps with 1000 genomes data
+2. GCTB SBayesRC (tuning, MCMC iterations and effect estimations)
+
+As we are processing multiple summary statistics, we combine all steps in one
+script to run on the background.
+
+```bash
+cd $WORKSPACE/work/scripts
+
+cat > run_loo_gctb_ukb.sh << 'EOF'
+#!/bin/bash
+
+export GCTB=`which gctb`
+
+export THREADS=32
+
+export WORKSPACE=/media/storage3/playground/b4uprs
+export WORKPATH=$WORKSPACE/work/BMI/LOO
+
+for DIR in `ls $WORKPATH`
+do
+
+    echo "========== Processing $DIR"
+    echo "==========  Step 1: Preprocessing"
+
+    mkdir -p $WORKPATH/$DIR/PRS
+    export LOCALDIR=$WORKPATH/$DIR/PRS
+    
+    $GCTB \
+      --ldm-eigen $WORKSPACE/resources/ukbEUR_Imputed \
+      --gwas-summary $WORKSPACE/work/METAL/metal_b4u.ma \
+      --impute-summary \
+      --out $LOCALDIR/b4u_ukb_gctb \
+      --thread $THREADS
+
+    echo "==========  Step 2: PRS derivation"
+
+    $GCTB \
+      --ldm-eigen $WORKSPACE/resources/ukbEUR_Imputed \
+      --gwas-summary $LOCALDIR/b4u_ukb_gctb.imputed.ma \
+      --sbayes RC \
+      --annot $WORKSPACE/resources/annot_baseline2.2.txt \
+      --out $LOCALDIR/b4u_ukb_gctb \
+      --thread $THREADS
+done
+EOF
+
+nohup bash run_loo_gctb_ukb.sh > run_loo_gctb_ukb.log &
+```
+
+### Basic filtering of GCTB SBayesRC derived PRS
+
+The GCTB SBayesRC PRS file has the format:
+
+```
+ Index                 Name  Chrom     Position     A1     A2        A1Frq     A1Effect           SE VarExplained          PEP          Pi1          Pi2          Pi3          Pi4          Pi5            PIP
+     1           rs12565286      1       721290      C      G     0.045726     0.000000     0.000000 0.000000e+00     0.000000     0.994805     0.004617     0.000549     0.000029     0.000000      0.0051949
+     2            rs3094315      1       752566      A      G     0.839960     0.000140     0.002029 4.040904e-08     0.005000     0.995331     0.004260     0.000391     0.000017     0.000000     0.00466907
+...
+```
+
+We keep the Chromosome, Name, A1, A1Effect, SE (for later introducing noise),
+PIP and remove SNPs with zero effect. We process both 1000 genomes EUR LD and
+built-in UKB derived PRS:
+
+```
+WORKSPACE=/media/storage3/playground/b4uprs
+WORKPATH=$WORKSPACE/work/BMI/LOO
+
+for DIR in `ls $WORKPATH`
+do
+    echo "========== Processing $DIR"
+    
+    # 1000 genomes
+    awk 'NR==1 { print "CHR\tSNP\tPOS\tA1\tBETA\tSE\tPIP" } 
+         NR>1 && $8 != 0 { print $3"\t"$2"\t"$4"\t"$5"\t"$8"\t"$9"\t"$17 }' \
+      $WORKPATH/$DIR/PRS/b4u_tgp_gctb.snpRes > \
+      $WORKPATH/$DIR/PRS/b4u_tgp_gctb.snpRes.prs
+
+    # Built-in
+    awk 'NR==1 { print "CHR\tSNP\tPOS\tA1\tBETA\tSE\tPIP" } 
+         NR>1 && $8 != 0 { print $3"\t"$2"\t"$4"\t"$5"\t"$8"\t"$9"\t"$17 }' \
+      $WORKPATH/$DIR/PRS/b4u_ukb_gctb.snpRes > \
+      $WORKPATH/$DIR/PRS/b4u_ukb_gctb.snpRes.prs
+done
+```
+
+### Baseline PRS with PRS-CS and 1000 genomes
+
+PRS-CS requires a PLINK BIM file for the variants in the validation population.
+BED files are not required as PRS-CS can operate on summary statistics. In this
+case the BIM file is used for overlap with the 1000 genomes LD. We created this
+BIM during METAL output preprocessing. One detail in this case is that the
+`--n_gwas` argument must be calculated for each LOO dataset.
+
+```bash
+cd $WORKSPACE/work/scripts
+
+cat > run_loo_prscs_tgp.sh << 'EOF'
+#!/bin/bash
+
+export PYTHON=`which python`
+
+export WORKSPACE=/media/storage3/playground/b4uprs
+export WORKPATH=$WORKSPACE/work/BMI/LOO
+
+for DIR in `ls $WORKPATH`
+do
+
+    echo "========== Processing $DIR"
+    
+    mkdir -p $WORKPATH/$DIR/PRS
+    export LOCALDIR=$WORKPATH/$DIR/PRS
+    
+    N_GWAS=$(Rscript -e '{
+        WORKSPACE <- Sys.getenv("WORKSPACE")
+        LOCALDIR <- Sys.getenv("LOCALDIR")
+
+        tmp <- read.delim(file.path(LOCALDIR,"..","METAL","metal_b4u.csx"))
+        N <- median(tmp$N)
+        cat(N)
+    }')
+
+    $PYTHON $WORKSPACE/resources/PRScs/PRScs.py \
+      --ref_dir=$WORKSPACE/resources/PRScsxLD/ldblk_1kg_eur \
+      --bim_prefix=$WORKPATH/$DIR/METAL/metal_b4u \
+      --sst_file=$WORKPATH/$DIR/METAL/metal_b4u.csx \
+      --n_gwas=$N_GWAS \
+      --out_dir=$LOCALDIR/b4u_tgp_prscs
+    
+    # Gather per chromosome results
+    for i in `seq 1 22`; 
+    do
+      cat $LOCALDIR/b4u_tgp_prscs_pst_eff_a1_b0.5_phiauto_chr${i}.txt
+    done > $LOCALDIR/b4u_tgp_prscs_pst_eff_a1_b0.5_phiauto.txt
+
+done
+EOF
+
+nohup bash run_loo_prscs_tgp.sh > run_loo_prscs_tgp.log &
+```
+
+or with GNU parallel:
+
+```bash
+cd $WORKSPACE/work/scripts
+
+cat > run_loo_prscs_tgp.sh << 'EOF'
+#!/bin/bash
+
+export N_THREADS=5
+export OMP_NUM_THREADS=$N_THREADS
+export OPENBLAS_NUM_THREADS=$N_THREADS
+export MKL_NUM_THREADS=$N_THREADS
+export NUMEXPR_NUM_THREADS=$N_THREADS
+
+export PYTHON=$(which python)
+export WORKSPACE=/media/storage3/playground/b4uprs
+export WORKPATH=$WORKSPACE/work/BMI/LOO
+
+process_dir() {
+    DIR="$1"
+    echo "========== Processing $DIR"
+    
+    mkdir -p $WORKPATH/$DIR/PRS
+    export LOCALDIR=$WORKPATH/$DIR/PRS
+    
+    N_GWAS=$(Rscript -e '{
+        LOCALDIR <- Sys.getenv("LOCALDIR")
+        tmp <- read.delim(file.path(LOCALDIR,"..","METAL","metal_b4u.csx"))
+        N <- median(tmp$N)
+        cat(N)
+    }')
+    
+    $PYTHON $WORKSPACE/resources/PRScs/PRScs.py \
+      --ref_dir=$WORKSPACE/resources/PRScsxLD/ldblk_1kg_eur \
+      --bim_prefix=$WORKPATH/$DIR/METAL/metal_b4u \
+      --sst_file=$WORKPATH/$DIR/METAL/metal_b4u.csx \
+      --n_gwas=$N_GWAS \
+      --out_dir=$LOCALDIR/b4u_tgp_prscs
+    
+    for i in {1..22}; do
+        cat $LOCALDIR/b4u_tgp_prscs_pst_eff_a1_b0.5_phiauto_chr${i}.txt
+    done > $LOCALDIR/b4u_tgp_prscs_pst_eff_a1_b0.5_phiauto.txt
+}
+
+export -f process_dir
+
+ls $WORKPATH | parallel -j 9 process_dir
+EOF
+
+nohup bash run_loo_prscs_tgp.sh > run_loo_prscs_tgp.log &
+```
+
+### Derivation of a common set of SNPs for all cohorts
+
+#### PRS with GCTB and 1000 genomes LD
+
+#### PRS with GCTB and built-in UKB LD
+
+#### PRS with PRS-CS and 1000 genomes LD
+
+
+## Notes
 
 1. Manual calculation of the `rate2pq` metric
 

@@ -22,9 +22,6 @@ gridSearch <- function(pip=c(0,0.001,0.005,0.01,0.05,0.1,0.2,0.3,0.4),
     #M <- evalPrs(prsFile,covFile,trait,genoBase,iidCol,sum,center,plink)
     
     # Initialize the objective function result arrays
-    #obj <- array(NA,dim=c(length(beta)+1,length(pip)+1,length(M$metrics)))
-    #rownames(obj) <- c("abs(BETA)>0",paste("abs(BETA)>",beta,sep=""))
-    #colnames(obj) <- c("PIP>0",paste("PIP>",pip,sep=""))
     obj <- array(NA,dim=c(length(beta),length(pip),length(.metricNames())))
     rownames(obj) <- paste("abs(BETA)>",beta,sep="")
     colnames(obj) <- paste("PIP>",pip,sep="")
@@ -158,33 +155,101 @@ formatPrs <- function(prsFile,outFile,from=c("sbayesrc","prscs"),pip=0.001) {
 # We accept only ending in *{chrSep}{chr}.bim, so if genoBase="COHORT" and
 # chrSep="_" then the bim file is COHORT_chr1.bim
 sanitizePrs <- function(prsFile,genoBase,perChr=FALSE,chrs=seq(22),chrSep="_",
-    from=c("sbayesrc","prscs","ready"),pip=0.001,rc=NULL) {
+    bgen=FALSE,from=c("sbayesrc","prscs","ready"),pip=0.001,
+    plink2=Sys.which("plink2"),rc=NULL) {
+    if (bgen && !(is.character(plink2) || file.exists(plink2)) 
+        stop("PLINK 2.0 is required by sanitizePrs() if you have bgen files!")
+        
     from <- from[1]
     
-    # Basic check, make sure that PLINK files exist
-    if (perChr) {
-        if (!file.exists(paste0(genoBase,chrSep,"chr1.bim")))
-            stop("PLINK files not found where expected!")
+    # Basic check, make sure that PLINK or BGEN files exist
+    if (bgen) {
+        if (perChr) {
+            if (!file.exists(paste0(genoBase,chrSep,"chr1.bgen")))
+                stop("BGEN files not found where expected!")
+        }
+        else {
+            if (!file.exists(paste0(genoBase,".bgen")))
+                stop("BGEN files not found where expected! genoBase is ",
+                    genoBase)
+        }
     }
     else {
-        if (!file.exists(paste0(genoBase,".bim")))
-            stop("PLINK files not found where expected! genoBase is ",genoBase)
+        if (perChr) {
+            if (!file.exists(paste0(genoBase,chrSep,"chr1.bim")))
+                stop("PLINK files not found where expected!")
+        }
+        else {
+            if (!file.exists(paste0(genoBase,".bim")))
+                stop("PLINK files not found where expected! genoBase is ",
+                    genoBase)
+        }
     }
     
     # Read SNP data (bim) and initial PRS
-    if (perChr) {
-        bims <- cmclapply(chrs,function(chr) {
-            bimFile <- paste0(genoBase,chrSep,"chr",chr,".bim")
-            message("Reading BIM ",bimFile)
-            bim <- read.delim(bimFile,header=FALSE)
-        },rc=rc)
-        bim <- do.call("rbind",bims)
+    if (bgen) {
+        if (perChr) {
+            bims <- cmclapply(chrs,function(chr) {
+                message("Converting to BIM with PLINK 2.0 for ",chr)
+                bFile <- paste0(genoBase,chrSep,"chr",chr,".bgen")
+                o <- tempfile()
+                # ref-unknown, sanitization will take care if problem
+                args <- c("--bgen",bFile,"ref-unknown --make-just-bim",
+                    "--out",o,"--silent") 
+                out <- tryCatch({
+                    suppressWarnings(system2(plink2,args=args))
+                    TRUE
+                },error=function(e) {
+                    message("Caught error: ",e$message)
+                    return(FALSE)
+                },finally="")
+                
+                if (!out)
+                    stop("Failed to generate BIM file for ",chr,
+                        "! Exiting...")
+                
+                message("Reading converted BIM for ",chr)
+                bim <- read.delim(paste0(o,".bim"),header=FALSE)
+                return(bim)
+            })
+            bim <- do.call("rbind",bims)
+        }
+        else {
+            bFile <- paste0(genoBase,".bgen")
+            o <- tempfile()
+            args <- c("--bgen",bFile,"ref-unknown --make-just-bim --out",o,
+                "--silent")
+            out <- tryCatch({
+                suppressWarnings(system2(plink2,args=args))
+                TRUE
+            },error=function(e) {
+                message("Caught error: ",e$message)
+                return(FALSE)
+            },finally="")
+
+            if (!out)
+                stop("Failed to generate BIM file! Exiting...")
+            
+            # If all ok, read the bim file
+            bim <- read.delim(paste0(o,".bim"),header=FALSE)
+        }
     }
     else {
-        bimFile <- paste0(genoBase,".bim")
-        message("Reading BIM ",bimFile)
-        bim <- read.delim(bimFile,header=FALSE)
+        if (perChr) {
+            bims <- cmclapply(chrs,function(chr) {
+                bimFile <- paste0(genoBase,chrSep,"chr",chr,".bim")
+                message("Reading BIM ",bimFile)
+                bim <- read.delim(bimFile,header=FALSE)
+            },rc=rc)
+            bim <- do.call("rbind",bims)
+        }
+        else {
+            bimFile <- paste0(genoBase,".bim")
+            message("Reading BIM ",bimFile)
+            bim <- read.delim(bimFile,header=FALSE)
+        }
     }
+    
     # Rename BIM columns for clarity
     colnames(bim) <- c("CHR","SNP","CM","BP","A1_bim","A2_bim")
     
@@ -214,10 +279,6 @@ sanitizePrs <- function(prsFile,genoBase,perChr=FALSE,chrs=seq(22),chrSep="_",
         merged$BETA[mismatch] <- -merged$BETA[mismatch]
         merged$A1[mismatch] <- merged$A1_bim[mismatch]
     }
-    
-    #outCov <- paste0(prsFile,".coverage")
-    #message("Writing coverage to ",outCov)
-    #writeLines(as.character(round(100*coverage,2)),outCov)
     
     # Output final PRS file (with updated A1 and BETA) - we fake the SE, PIP
     # column in the case of PRS-CS
@@ -263,9 +324,15 @@ sanitizePrs <- function(prsFile,genoBase,perChr=FALSE,chrs=seq(22),chrSep="_",
 # NOTE well that there are tiny differences (range -10e-6, 10e-6 for HUA) 
 # between the two approaches which are attributed to floating point rounds and
 # calculations. plink2 now required for bgen input.
+# As there has been mixups reported regarding plink/plink2 usage, we try to add
+# explicit support for both.
 evalPrs <- function(prsFile,covFile,trait,genoBase,perChr=FALSE,chrs=seq(22),
     chrSep="_",iidCol=2,sum=TRUE,center=FALSE,bgen=FALSE,
     plink=Sys.which("plink"),plink2=Sys.which("plink2"),rc=NULL) {
+    # Determine plink version(s) to use and for what purpose
+    proceed <- .informAboutPlinkVersions(plink,plink2)
+    if (!proceed) return()
+    
     # Base name for plink score output
     prsName <- sub("\\.[^.]*$","",prsFile)
     
@@ -342,7 +409,7 @@ evalPrs <- function(prsFile,covFile,trait,genoBase,perChr=FALSE,chrs=seq(22),
         # Now calculate scores per chromosome
         if (bgen) {
             scoreFiles <- unlist(cmclapply(chrs,function(chr) {
-                message("Calculating score with PLINK --score for ",chr)
+                message("Calculating score with PLINK 2.0 --score for ",chr)
                 bFile <- paste0(genoBase,chrSep,"chr",chr,".bgen")
                 pFile <- prsSplit[chr]
                 o <- tempfile()
@@ -367,7 +434,7 @@ evalPrs <- function(prsFile,covFile,trait,genoBase,perChr=FALSE,chrs=seq(22),
         }
         else {
             scoreFiles <- unlist(cmclapply(chrs,function(chr) {
-                message("Calculating score with PLINK --score for ",chr)
+                message("Calculating score with PLINK 1.9 --score for ",chr)
                 bFile <- paste0(genoBase,chrSep,"chr",chr)
                 pFile <- prsSplit[chr]
                 o <- tempfile()
@@ -401,7 +468,7 @@ evalPrs <- function(prsFile,covFile,trait,genoBase,perChr=FALSE,chrs=seq(22),
         theScore <- data.frame(SCORE=rowSums(chrScores))
     }
     else {
-        #message("Calculating score with PLINK --score")
+        message("Calculating score with PLINK 2.0 --score")
         if (bgen) {
             bgenFile <- paste0(genoBase,".bgen")
             args <- c("--bgen",bgenFile,"ref-unknown --score",
@@ -429,13 +496,14 @@ evalPrs <- function(prsFile,covFile,trait,genoBase,perChr=FALSE,chrs=seq(22),
                 comment.char="")
         }
         else {
+            message("Calculating score with PLINK 1.9 --score")
             args <- c("--bfile",genoBase,"--score",prsFile,"1 2 3 header",
                 ifelse(sum,"sum",""),ifelse(center,"center",""),"--out",prsName)
             if (!is.null(remFile))
                 args <- c(args,"--remove",remFile)
             args <- c(args,"--silent")
             out <- tryCatch({
-                suppressWarnings(system2(plink2,args=args))
+                suppressWarnings(system2(plink,args=args))
                 TRUE
             },error=function(e) {
                 message("Caught error: ",e$message)
@@ -545,11 +613,7 @@ evalPrs <- function(prsFile,covFile,trait,genoBase,perChr=FALSE,chrs=seq(22),
             prs_pheno_r2_raw=craw^2,
             prs_pheno_r2_resy=dr2_residy,
             prs_pheno_r2_resb=dr2_residb,
-            snps_covered=nsnps#,
-            #penal_prs_r2=-log10((fullR2-nullR2)/nsnps),
-            #penal_prs_pheno_cor=-log10(craw/nsnps),
-            #penal_prs_pheno_r2_resy=-log10(dr2_residy/nsnps),
-            #penal_prs_pheno_r2_resb=-log10(dr2_residb/nsnps)
+            snps_covered=nsnps
         ),
         prs=pcovars$PRS
     ))
@@ -627,6 +691,49 @@ cmclapply <- function(...,rc) {
   ))
 }
 
+.informAboutPlinkVersions <- function(plink,plink2) {
+    if (is.character(plink) && file.exists(plink) 
+        && is.character(plink2) && file.exists(plink2)) {
+        message("Both plink 1.9 and plink 2.0 are found on the system.")
+        if (bgen) {
+            message("BGEN genotype file input requested.")
+            message("plink 2.0 will be used for scoring.")
+        }
+        else
+            message("plink 1.9 will be used for scoring.")
+        return(TRUE)
+    }
+    else if (is.character(plink) && file.exists(plink) 
+        && (!is.character(plink2) || !file.exists(plink2))) {
+        message("Only plink 1.9 was found on the system.")
+        if (bgen) {
+            message("BGEN genotype file input requested.")
+            message("Please do not set the plink argument to point to plink2 ",
+                "executable, the flow will be compromised.")
+            message("plink 2.0 is required for scoring. Exiting...")
+            return(FALSE)
+        }
+        else
+            message("plink 1.9 will be used for scoring.")
+        return(TRUE)
+    }
+    else if ((!is.character(plink) || !file.exists(plink)) 
+        && is.character(plink2) && file.exists(plink2)) {
+        message("Only plink 2.0 was found on the system.")
+        if (bgen) {
+            message("BGEN genotype file input requested.")
+            message("plink 2.0 will be used for scoring.")
+        }
+        else
+            message("plink 2.0 will be used for scoring.")
+        return(TRUE)
+    }
+    else {
+        message("FATAL! Neither plink 1.9 nor plink 2.0 were found on the ",
+            "system! Exiting...")
+        return(FALSE)
+    }
+}
 ################################################################################
 
 ## ------------------------------------------------------------
