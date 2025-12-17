@@ -157,7 +157,7 @@ formatPrs <- function(prsFile,outFile,from=c("sbayesrc","prscs"),pip=0.001) {
 sanitizePrs <- function(prsFile,genoBase,perChr=FALSE,chrs=seq(22),chrSep="_",
     bgen=FALSE,from=c("sbayesrc","prscs","ready"),pip=0.001,
     plink2=Sys.which("plink2"),rc=NULL) {
-    if (bgen && !(is.character(plink2) || file.exists(plink2)) 
+    if (bgen && !(is.character(plink2) || file.exists(plink2))) 
         stop("PLINK 2.0 is required by sanitizePrs() if you have bgen files!")
         
     from <- from[1]
