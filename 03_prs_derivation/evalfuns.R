@@ -211,10 +211,11 @@ sanitizePrs <- function(prsFile,genoBase,perChr=FALSE,chrs=seq(22),chrSep="_",
                 message("Reading converted BIM for ",chr)
                 bim <- read.delim(paste0(o,".bim"),header=FALSE)
                 return(bim)
-            })
+            },rc=rc)
             bim <- do.call("rbind",bims)
         }
         else {
+            message("Converting to BIM with PLINK 2.0")
             bFile <- paste0(genoBase,".bgen")
             o <- tempfile()
             args <- c("--bgen",bFile,"ref-unknown --make-just-bim --out",o,

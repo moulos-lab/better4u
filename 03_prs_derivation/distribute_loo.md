@@ -318,7 +318,7 @@ sanFile_PRSCS_TGP <- sanitizePrs(prsFile_PRSCS_TGP,genoBase,from="ready")
 # sanFile_PRSCS_TGP <- sanitizePrs(prsFile_PRSCS_TGP,genoBase,bgen=TRUE,
 #   from="ready")
 
-# PGEN files per chromosome - if required
+# ΒGEN files per chromosome - if required
 #sanFile_SBRC_TGP <- sanitizePrs(prsFile_SBRC_TGP,genoBase,perChr=TRUE,
 #   bgen=TRUE,from="sbayesrc",rc=0.2)
 #sanFile_SBRC_UKB <- sanitizePrs(prsFile_SBRC_UKB,genoBase,perChr=TRUE,
