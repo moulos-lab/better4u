@@ -307,7 +307,7 @@ sanFile_PRSCS_TGP <- sanitizePrs(prsFile_PRSCS_TGP,genoBase,from="ready")
 #   from="sbayesrc",rc=0.2)
 #sanFile_SBRC_UKB <- sanitizePrs(prsFile_SBRC_UKB,genoBase,perChr=TRUE,
 #   from="sbayesrc",rc=0.2)
-#sanFile_PRSCS_TGP <- sanitizePrs(prsFile_PRSCS_REC,genoBase,perChr=TRUE,
+#sanFile_PRSCS_TGP <- sanitizePrs(prsFile_PRSCS_TGP,genoBase,perChr=TRUE,
 #   from="ready",rc=0.2)
 
 # BGEN file (PLINK 2.0 required in path!):
@@ -323,7 +323,7 @@ sanFile_PRSCS_TGP <- sanitizePrs(prsFile_PRSCS_TGP,genoBase,from="ready")
 #   bgen=TRUE,from="sbayesrc",rc=0.2)
 #sanFile_SBRC_UKB <- sanitizePrs(prsFile_SBRC_UKB,genoBase,perChr=TRUE,
 #   bgen=TRUE,from="sbayesrc",rc=0.2)
-#sanFile_PRSCS_TGP <- sanitizePrs(prsFile_PRSCS_REC,genoBase,perChr=TRUE,
+#sanFile_PRSCS_TGP <- sanitizePrs(prsFile_PRSCS_TGP,genoBase,perChr=TRUE,
 #   bgen=TRUE,from="ready",rc=0.2)
 
 # Three files are written:
@@ -335,7 +335,7 @@ sanFile_PRSCS_TGP <- sanitizePrs(prsFile_PRSCS_TGP,genoBase,from="ready")
 # Single PLINK file:
 M_SBRC_TGP <- evalPrs(sanFile_SBRC_TGP,covFile,trait,genoBase)
 M_SBRC_UKB <- evalPrs(sanFile_SBRC_UKB,covFile,trait,genoBase)
-M_PRSCS_TGP <- evalPrs(sanFile_PRSCS_REC,covFile,trait,genoBase)
+M_PRSCS_TGP <- evalPrs(sanFile_PRSCS_TGP,covFile,trait,genoBase)
 
 # Or if you have BGEN + SAMPLE file instead of PLINK files
 #M_SBRC_TGP <- evalPrs(sanFile_SBRC_TGP,covFile,trait,genoBase,bgen=TRUE)
@@ -374,7 +374,7 @@ metrics <- data.frame(
 add <- as.data.frame(rbind(
     as.integer(c(N_SBRC_TGP,N_SBRC_UKB,N_PRSCS_TGP)),
     round(100*as.numeric(metrics[nrow(metrics),])/
-        c(N_SBRC_TGP,N_SBRC_UKB,N_PRSCS_REC),digits=2)
+        c(N_SBRC_TGP,N_SBRC_UKB,N_PRSCS_TGP),digits=2)
 ))
 rownames(add) <- c("snps_total","coverage")
 colnames(add) <- names(metrics)

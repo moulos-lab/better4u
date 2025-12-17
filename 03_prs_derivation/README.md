@@ -2414,7 +2414,7 @@ do
     
     $GCTB \
       --ldm-eigen $WORKSPACE/resources/ukbEUR_Imputed \
-      --gwas-summary $WORKSPACE/work/METAL/metal_b4u.ma \
+      --gwas-summary $WORKPATH/$DIR/METAL/metal_b4u.ma \
       --impute-summary \
       --out $LOCALDIR/b4u_ukb_gctb \
       --thread $THREADS
@@ -2580,12 +2580,168 @@ nohup bash run_loo_prscs_tgp.sh > run_loo_prscs_tgp.log &
 
 ### Derivation of a common set of SNPs for all cohorts
 
-#### PRS with GCTB and 1000 genomes LD
+The following Rscript:
 
-#### PRS with GCTB and built-in UKB LD
+1. Parses the results for each PRS derivation strategy.
+2. Determines SNPs appearing in at least 5 cohorts for each strategy.
+3. Constructs PRS score files based on (2), esnuring the same SNPs in each file.
+SNPs not present in any score file are assign with a 0 beta weight.
 
-#### PRS with PRS-CS and 1000 genomes LD
+```r
+Rscript \
+  -e '{
+    WORKSPACE <- Sys.getenv("WORKSPACE")
 
+    source(file.path(WORKSPACE,"resources","better4u","03_prs_derivation",
+        "evalfuns.R"))
+
+    pwd <- getwd()
+    setwd(file.path(WORKSPACE,"work","BMI","LOO"))
+
+    dirs <- dir()
+    snps1 <- snps2 <- snps3 <- vector("list",length(dirs))
+    names(snps1) <- names(snps2) <- names(snps3) <- dirs
+    prePrsFile_GCTB_TGP <- prePrsFile_GCTB_UKB <- prePrsFile_PRSCS_TGP <- 
+        vector("list",length(dirs))
+    names(prePrsFile_GCTB_TGP) <- names(prePrsFile_GCTB_UKB) <- 
+        names(prePrsFile_PRSCS_TGP) <- dirs
+    for (looD in dirs) {
+        message("Reading SNPs from ",looD)
+        message("  Reading GCTB TGP")
+        prePrsFile_GCTB_TGP[[looD]] <- read.delim(file.path(looD,"PRS",
+           "b4u_tgp_gctb.snpRes.prs"))
+        message("  Reading GCTB UKB")
+        prePrsFile_GCTB_UKB[[looD]] <- read.delim(file.path(looD,"PRS",
+           "b4u_ukb_gctb.snpRes.prs"))
+        message("  Reading PRSCS TGP")
+        prePrsFile_PRSCS_TGP[[looD]] <- read.delim(file.path(looD,"PRS",
+           "b4u_tgp_prscs_pst_eff_a1_b0.5_phiauto.txt"),header=FALSE)
+        
+        rownames(prePrsFile_GCTB_TGP[[looD]]) <- prePrsFile_GCTB_TGP[[looD]]$SNP
+        rownames(prePrsFile_GCTB_UKB[[looD]]) <- prePrsFile_GCTB_UKB[[looD]]$SNP
+        rownames(prePrsFile_PRSCS_TGP[[looD]]) <- prePrsFile_PRSCS_TGP[[looD]][,2]
+        colnames(prePrsFile_PRSCS_TGP[[looD]]) <-
+            c("CHR","SNP","BP","A1","A2","BETA")
+        prePrsFile_PRSCS_TGP[[looD]]$SE <- 0
+        prePrsFile_PRSCS_TGP[[looD]]$PIP <- 0.001
+        
+        snps1[[looD]] <- prePrsFile_GCTB_TGP[[looD]]$SNP
+        snps2[[looD]] <- prePrsFile_GCTB_UKB[[looD]]$SNP
+        snps3[[looD]] <- prePrsFile_PRSCS_TGP[[looD]][,2]
+    }
+
+    snps1c <- Reduce("intersect",snps1) # Yields only 55-58% overlap with cohorts
+    snps2c <- Reduce("intersect",snps2) # Yields only 62-65% overlap with cohorts
+    snps3c <- Reduce("intersect",snps3) # Yields >99.9% overlap with cohorts - OK
+
+    ## Build GCTB TGP score files per cohort
+
+    # 1. Read SNP info for those missing
+    snp_info_tgp <- read.delim(file.path(WORKSPACE,"resources","EUR_LD",
+        "snp.info"))
+    rownames(snp_info_tgp) <- snp_info_tgp$ID
+
+    # 2. Frequency of all GCTB TGP SNPs - get those in >=5 cohorts
+    all_snps_1 <- table(unlist(snps1))
+    snps_1_g5 <- names(which(all_snps_1>=5))
+
+    # 3. For each cohort build a file consisting of 
+    #    i)  present SNPs,
+    #    ii) fill the absent from the snp.info
+    for (looD in dirs) {
+        message("Processing SNPs from ",looD)
+        
+        message("  Geting SNPs")
+        # Present SNPs
+        pr <- intersect(rownames(prePrsFile_GCTB_TGP[[looD]]),snps_1_g5)
+        # Absent SNPs
+        ab <- setdiff(snps_1_g5,rownames(prePrsFile_GCTB_TGP[[looD]]))
+        prdf <- prePrsFile_GCTB_TGP[[looD]][pr,,drop=FALSE]
+        f <- snp_info_tgp[ab,c(1,2,5,6),drop=FALSE]
+        fill <- cbind(f,0,0,0)
+        names(fill) <- names(prdf)
+        prsdf <- rbind(prdf,fill)
+        prsdf <- prsdf[order(prsdf$CHR,prsdf$SNP),]
+        
+        message("  Writing output")
+        outName <- paste0("b4u_bmi_sbrc_tgp_",looD,".prs")
+        outFile <- file.path(WORKSPACE,"work","BMI","LOO",looD,"PRS",outName)
+        write.table(prsdf,file=outFile,quote=FALSE,sep="\t",row.names=FALSE)
+    }
+
+    ## Build GCTB UKB score files per cohort
+
+    # 1. Read SNP info for those missing
+    snp_info_ukb <- read.delim(file.path(WORKSPACE,"resources","ukbEUR_Imputed",
+        "snp.info"))
+    rownames(snp_info_ukb) <- snp_info_ukb$ID
+
+    # 2. Frequency of all GCTB TGP SNPs - get those in >=5 cohorts
+    all_snps_2 <- table(unlist(snps2))
+    snps_2_g5 <- names(which(all_snps_2>=5))
+
+    # 3. For each cohort build a file consisting of 
+    #    i)  present SNPs,
+    #    ii) fill the absent from the snp.info
+    for (looD in dirs) {
+        message("Processing SNPs from ",looD)
+        
+        message("  Getting SNPs")
+        # Present SNPs
+        pr <- intersect(rownames(prePrsFile_GCTB_UKB[[looD]]),snps_2_g5)
+        # Absent SNPs
+        ab <- setdiff(snps_2_g5,rownames(prePrsFile_GCTB_UKB[[looD]]))
+        prdf <- prePrsFile_GCTB_UKB[[looD]][pr,,drop=FALSE]
+        f <- snp_info_ukb[ab,c(1,2,5,6),drop=FALSE]
+        fill <- cbind(f,0,0,0)
+        names(fill) <- names(prdf)
+        prsdf <- rbind(prdf,fill)
+        prsdf <- prsdf[order(prsdf$CHR,prsdf$SNP),]
+        
+        message("  Writing output")
+        outName <- paste0("b4u_bmi_sbrc_ukb_",looD,".prs")
+        outFile <- file.path(WORKSPACE,"work","BMI","LOO",looD,"PRS",outName)
+        write.table(prsdf,file=outFile,quote=FALSE,sep="\t",row.names=FALSE)
+    }
+
+    ## Build PRSCS TGP score files per cohort
+
+    # 1. Read SNP info for those missing
+    snp_info_prscs <- read.delim(file.path(WORKSPACE,"resources","PRScsxLD",
+        "snpinfo_mult_1kg_hm3"))
+    rownames(snp_info_prscs) <- snp_info_prscs$SNP
+
+    # 2. Frequency of all GCTB TGP SNPs - get those in >=5 cohorts
+    all_snps_3 <- table(unlist(snps3))
+    snps_3_g5 <- names(which(all_snps_3>=5))
+
+    # 3. For each cohort build a file consisting of 
+    #    i)  present SNPs,
+    #    ii) fill the absent from the snp.info
+    for (looD in dirs) {
+        message("Processing SNPs from ",looD)
+        
+        message("  Getting SNPs")
+        # Present SNPs
+        pr <- intersect(rownames(prePrsFile_PRSCS_TGP[[looD]]),snps_3_g5)
+        # Absent SNPs
+        ab <- setdiff(snps_3_g5,rownames(prePrsFile_PRSCS_TGP[[looD]]))
+        prdf <- prePrsFile_PRSCS_TGP[[looD]][pr,,drop=FALSE]
+        f <- snp_info_prscs[ab,1:5,drop=FALSE]
+        if (nrow(f) > 0) {
+            fill <- cbind(f,0,0,0)
+            names(fill) <- names(prdf)
+            prsdf <- rbind(prdf,fill)
+        }       
+        prsdf <- prsdf[order(prsdf$CHR,prsdf$SNP),]
+        
+        message("  Writing output")
+        outName <- paste0("b4u_bmi_prscs_tgp_",looD,".prs")
+        outFile <- file.path(WORKSPACE,"work","BMI","LOO",looD,"PRS",outName)
+        write.table(prsdf,file=outFile,quote=FALSE,sep="\t",row.names=FALSE)
+    }
+  }
+```
 
 ## Notes
 

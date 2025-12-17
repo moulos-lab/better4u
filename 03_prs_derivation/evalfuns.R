@@ -469,8 +469,8 @@ evalPrs <- function(prsFile,covFile,trait,genoBase,perChr=FALSE,chrs=seq(22),
         theScore <- data.frame(SCORE=rowSums(chrScores))
     }
     else {
-        message("Calculating score with PLINK 2.0 --score")
         if (bgen) {
+            message("Calculating score with PLINK 2.0 --score")
             bgenFile <- paste0(genoBase,".bgen")
             args <- c("--bgen",bgenFile,"ref-unknown --score",
                 prsFile,"1 2 3 header",
