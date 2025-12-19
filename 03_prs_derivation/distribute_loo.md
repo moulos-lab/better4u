@@ -148,7 +148,7 @@ the files and place to the working folder:
 gdown 10F6O-SFC-5FLBC_2CrSCkTsQcrIlH2vI --output b4u_bmi_sbrc_tgp_BIB_out.prs
 
 # b4u_bmi_sbrc_ukb_BIB_out.prs
-gdown 1OEVKvi1hi6Ef3H0N8OGdHvUvt4S16dCB --output b4u_bmi_sbrc_ukb_BIB_out.prs
+gdown 1vRF62465gqVR1-XzwYDcVMZQ7B681KgS --output b4u_bmi_sbrc_ukb_BIB_out.prs
 
 # b4u_bmi_prscs_tgp_BIB_out.prs
 gdown 11OUijyhx5bh-Fu-yB43zu5NiQsi6ujag --output b4u_bmi_prscs_tgp_BIB_out.prs
@@ -161,7 +161,7 @@ gdown 11OUijyhx5bh-Fu-yB43zu5NiQsi6ujag --output b4u_bmi_prscs_tgp_BIB_out.prs
 gdown 1ONrJFrHOinBjfIzj4-V2bzZAoC44MByT --output b4u_bmi_sbrc_tgp_BIONIC_out.prs
 
 # b4u_bmi_sbrc_ukb_BIONIC_out.prs
-gdown 1bZ14aPHjBkJ5TJcXPLGOZ1fzaqDtgg27 --output b4u_bmi_sbrc_ukb_BIONIC_out.prs
+gdown 1RGPJtzscWcK91IluE6DAMpLP7iEvbzOk --output b4u_bmi_sbrc_ukb_BIONIC_out.prs
 
 # b4u_bmi_prscs_tgp_BIONIC_out.prs
 gdown 1qCxx1UKafra343-1P6XJEi7HhnMw1el2 --output b4u_bmi_prscs_tgp_BIONIC_out.prs
@@ -174,7 +174,7 @@ gdown 1qCxx1UKafra343-1P6XJEi7HhnMw1el2 --output b4u_bmi_prscs_tgp_BIONIC_out.pr
 gdown 13n6mceDou3p3LQPLi1BGJqi_sL3qkOsl --output b4u_bmi_sbrc_tgp_HMGU_out.prs
 
 # b4u_bmi_sbrc_ukb_HMGU_out.prs
-gdown 1NVJbRHdpAAO-oFx807dlehgy8V3hqUeX --output b4u_bmi_sbrc_ukb_HMGU_out.prs
+gdown 1GuI2AheG6GRpmEJCSz7Q-kUc71tYkqMq --output b4u_bmi_sbrc_ukb_HMGU_out.prs
 
 # b4u_bmi_prscs_tgp_HMGU_out.prs
 gdown 1p4HxWXWNea5GkmbkPf-YstLvX8-6zOvZ --output b4u_bmi_prscs_tgp_HMGU_out.prs
@@ -187,7 +187,7 @@ gdown 1p4HxWXWNea5GkmbkPf-YstLvX8-6zOvZ --output b4u_bmi_prscs_tgp_HMGU_out.prs
 gdown 1CLY_hSDPxkT4Mo-51AEmkrKvzl5uCiYn --output b4u_bmi_sbrc_tgp_HUA_out.prs
 
 # b4u_bmi_sbrc_ukb_HUA_out.prs
-gdown 1taZrSCXLUPGSTB7rdrjcXo411xkT_JqX --output b4u_bmi_sbrc_ukb_HUA_out.prs
+gdown 15KwAELxNZZMJvtYpCtGm4BTgTiRJn2PE --output b4u_bmi_sbrc_ukb_HUA_out.prs
 
 # b4u_bmi_prscs_tgp_HUA_out.prs
 gdown 1rD6-rQHXUhrR4feyN5ktBhpHa908wj7e --output b4u_bmi_prscs_tgp_HUA_out.prs
@@ -200,7 +200,7 @@ gdown 1rD6-rQHXUhrR4feyN5ktBhpHa908wj7e --output b4u_bmi_prscs_tgp_HUA_out.prs
 gdown 1glJ1f_yx0hMJN4b3X8Fjt2hI0oR_SYrE --output b4u_bmi_prscs_tgp_MUW_out.prs
 
 # b4u_bmi_sbrc_ukb_MUW_out.prs
-gdown 1AV_z8vd_OpyJLHyM2yUn5NN1W0on5qec --output b4u_bmi_sbrc_ukb_MUW_out.prs
+gdown 1zCONruHZAZbYOnqjbS4AsecB_7hY16Sh --output b4u_bmi_sbrc_ukb_MUW_out.prs
 
 # b4u_bmi_prscs_tgp_MUW_out.prs
 gdown 1Ra7qya5iUvih2EizKBiinVjTdADYF105 --output b4u_bmi_prscs_tgp_MUW_out.prs
@@ -213,7 +213,7 @@ gdown 1Ra7qya5iUvih2EizKBiinVjTdADYF105 --output b4u_bmi_prscs_tgp_MUW_out.prs
 gdown 1DQ_rBwDObkT058oHeRZDIaf_VtItPs7G --output b4u_bmi_sbrc_tgp_TAUH_out.prs
 
 # b4u_bmi_sbrc_ukb_TAUH_out.prs
-gdown 1-pgDhW34-di6n0EnbYMwIbwWVrQsM4Il --output b4u_bmi_sbrc_ukb_TAUH_out.prs
+gdown 1pQy6MeNmYwHaw8MayOb4aL8ed53uzRTd --output b4u_bmi_sbrc_ukb_TAUH_out.prs
 
 # b4u_bmi_prscs_tgp_TAUH_out.prs
 gdown 1EwW0n1mCszONjpk5G_n64oAfhXY1naJL --output b4u_bmi_prscs_tgp_TAUH_out.prs
@@ -226,7 +226,7 @@ gdown 1EwW0n1mCszONjpk5G_n64oAfhXY1naJL --output b4u_bmi_prscs_tgp_TAUH_out.prs
 gdown 1B-a2HkgqMuMtQxlXjdXj2Z6VJDopoHjV --output b4u_bmi_sbrc_tgp_UH_out.prs
 
 # b4u_bmi_sbrc_ukb_UH_out.prs
-gdown 12JxNNCexCiDOKtvqBBCP-le_6TTWAet7 --output b4u_bmi_sbrc_ukb_UH_out.prs
+gdown 1gvT2dtRHNnY-igY5V9YL-b3kt2A1FlMD --output b4u_bmi_sbrc_ukb_UH_out.prs
 
 # b4u_bmi_prscs_tgp_UH_out.prs
 gdown 1_oRwvX6t_45Ssrby5kMuP3_4_W00O4kz --output b4u_bmi_prscs_tgp_UH_out.prs
@@ -239,7 +239,7 @@ gdown 1_oRwvX6t_45Ssrby5kMuP3_4_W00O4kz --output b4u_bmi_prscs_tgp_UH_out.prs
 gdown 1gVxGrezId1qlRyzOQaUWa6LsAR64rVOn --output b4u_bmi_sbrc_tgp_UTARTU_out.prs
 
 # b4u_bmi_sbrc_ukb_UTARTU_out.prs
-gdown 1ibimtvB_18Fu5Gs5yC1xzFXVJaNRDs2P --output b4u_bmi_sbrc_ukb_UTARTU_out.prs
+gdown 1f63ZSufCM28Xx9YCrfH_PLFmKOXPHfF_ --output b4u_bmi_sbrc_ukb_UTARTU_out.prs
 
 # b4u_bmi_prscs_tgp_UTARTU_out.prs
 gdown 1m5MVh04xtdD6-oKNGMgBpH7tNBisJohV --output b4u_bmi_prscs_tgp_UTARTU_out.prs
@@ -252,7 +252,7 @@ gdown 1m5MVh04xtdD6-oKNGMgBpH7tNBisJohV --output b4u_bmi_prscs_tgp_UTARTU_out.pr
 gdown 1_qbOj4r8j3SyHJjR36WHEBViNJjBRwex --output b4u_bmi_sbrc_tgp_VUA_out.prs
 
 # b4u_bmi_sbrc_ukb_VUA_out.prs
-gdown 1H4dPuQVZSH2ev070oOzlRuATd13ZHWX0 --output b4u_bmi_sbrc_ukb_VUA_out.prs
+gdown 1PE935x4AOGCj6zBS-87ZHzXdrNzNO7PD --output b4u_bmi_sbrc_ukb_VUA_out.prs
 
 # b4u_bmi_prscs_tgp_VUA_out.prs
 gdown 1noxG7PXk4HAyLJ8jhoW89L2b9NjcdIcG --output b4u_bmi_prscs_tgp_VUA_out.prs
@@ -282,7 +282,7 @@ covFile <- "covariates.txt"
 # Assuming this is the BMI name in covariates, otherwise adjust accordingly
 trait <- "bmi"
 
-# Your cohort name, e.g. BIB
+# Your cohort name, e.g. HUA
 cohort <- "YOUR_COHORT_NAME"
 
 # Then, with the downloaded PRS score files
