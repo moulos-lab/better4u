@@ -136,7 +136,8 @@ The files are named with the following pattern:
 
 You can find these files in [this](https://drive.google.com/drive/folders/19unmYal4uqk97jpZKwSSNuaaVyGWSD8n?usp=sharing)
 Google Drive link. Each subdirectory is named according to the left-out cohort.
-YOu should download and place them inside the working directory. For your 
+YOu should download and place them inside the working directory. Files where
+SNPs are named based on `CHR:POS:REF:ALT` are also available. For your 
 convenience, we also provide `gdown` download links, if you have 
 [gdown](https://github.com/wkentaro/gdown) installed, otherwise just download
 the files and place to the working folder:
@@ -154,6 +155,19 @@ gdown 1vRF62465gqVR1-XzwYDcVMZQ7B681KgS --output b4u_bmi_sbrc_ukb_BIB_out.prs
 gdown 11OUijyhx5bh-Fu-yB43zu5NiQsi6ujag --output b4u_bmi_prscs_tgp_BIB_out.prs
 ```
 
+**or if you prefer `CHR:POS:REF:ALT` SNP ID format:**
+
+```bash
+# b4u_bmi_sbrc_tgp_BIB_out.prs
+gdown 11H1_kwPiuuBA8y2KinmxxEgfDRYCWRrU --output b4u_bmi_sbrc_tgp_BIB_out.prs
+
+# b4u_bmi_sbrc_ukb_BIB_out.prs
+gdown 1w3KX4M0zHyhcITblwh_Amo1L-MTw3x2Y --output b4u_bmi_sbrc_ukb_BIB_out.prs
+
+# b4u_bmi_prscs_tgp_BIB_out.prs
+gdown 1g-o6tizFvlqO6R3ZvVzRem0Z9jJ13RG_ --output b4u_bmi_prscs_tgp_BIB_out.prs
+```
+
 #### BIONIC
 
 ```bash
@@ -165,6 +179,19 @@ gdown 1RGPJtzscWcK91IluE6DAMpLP7iEvbzOk --output b4u_bmi_sbrc_ukb_BIONIC_out.prs
 
 # b4u_bmi_prscs_tgp_BIONIC_out.prs
 gdown 1qCxx1UKafra343-1P6XJEi7HhnMw1el2 --output b4u_bmi_prscs_tgp_BIONIC_out.prs
+```
+
+**or if you prefer `CHR:POS:REF:ALT` SNP ID format:**
+
+```bash
+# b4u_bmi_sbrc_tgp_BIONIC_out.prs
+gdown 1nb29j_7KtU8HIDtz_AC64IT_DLH0M1Rd --output b4u_bmi_sbrc_tgp_BIONIC_out.prs
+
+# b4u_bmi_sbrc_ukb_BIONIC_out.prs
+gdown 1M7Ok2iHypMM-z923O_Wcq-FPNnJ-h8rU --output b4u_bmi_sbrc_ukb_BIONIC_out.prs
+
+# b4u_bmi_prscs_tgp_BIONIC_out.prs
+gdown 1lY5qPmanLVPR_ybo7B9J8vuAgGU5Slww --output b4u_bmi_prscs_tgp_BIONIC_out.prs
 ```
 
 #### HMGU
@@ -180,6 +207,19 @@ gdown 1GuI2AheG6GRpmEJCSz7Q-kUc71tYkqMq --output b4u_bmi_sbrc_ukb_HMGU_out.prs
 gdown 1p4HxWXWNea5GkmbkPf-YstLvX8-6zOvZ --output b4u_bmi_prscs_tgp_HMGU_out.prs
 ```
 
+**or if you prefer `CHR:POS:REF:ALT` SNP ID format:**
+
+```bash
+# b4u_bmi_sbrc_tgp_HMGU_out.prs
+gdown 1zzvA2bb-ixDa-z6f3H1dxl4zPO00H0JY --output b4u_bmi_sbrc_tgp_HMGU_out.prs
+
+# b4u_bmi_sbrc_ukb_HMGU_out.prs
+gdown 1FjLV1yaiot0e1N7q3x3QD7fMCkJw8cCI --output b4u_bmi_sbrc_ukb_HMGU_out.prs
+
+# b4u_bmi_prscs_tgp_HMGU_out.prs
+gdown 12O-mB-VIpAiRFDMRoWO68-BH196-h74Z --output b4u_bmi_prscs_tgp_HMGU_out.prs
+```
+
 #### HUA
 
 ```bash
@@ -191,6 +231,19 @@ gdown 15KwAELxNZZMJvtYpCtGm4BTgTiRJn2PE --output b4u_bmi_sbrc_ukb_HUA_out.prs
 
 # b4u_bmi_prscs_tgp_HUA_out.prs
 gdown 1rD6-rQHXUhrR4feyN5ktBhpHa908wj7e --output b4u_bmi_prscs_tgp_HUA_out.prs
+```
+
+**or if you prefer `CHR:POS:REF:ALT` SNP ID format:**
+
+```bash
+# b4u_bmi_sbrc_tgp_HUA_out.prs
+gdown 1K4Tmod8IirKr-qqmZOBLlOw2nR51h8R8 --output b4u_bmi_sbrc_tgp_HUA_out.prs
+
+# b4u_bmi_sbrc_ukb_HUA_out.prs
+gdown 1y9dEf8ApMemSUnKdeA5FWN2C_y3Uf_7y --output b4u_bmi_sbrc_ukb_HUA_out.prs
+
+# b4u_bmi_prscs_tgp_HUA_out.prs
+gdown 1Dsya9f6UfHRhJPPktqhoP7v6w5ko8bDb --output b4u_bmi_prscs_tgp_HUA_out.prs
 ```
 
 #### MUW
@@ -206,6 +259,19 @@ gdown 1zCONruHZAZbYOnqjbS4AsecB_7hY16Sh --output b4u_bmi_sbrc_ukb_MUW_out.prs
 gdown 1Ra7qya5iUvih2EizKBiinVjTdADYF105 --output b4u_bmi_prscs_tgp_MUW_out.prs
 ```
 
+**or if you prefer `CHR:POS:REF:ALT` SNP ID format:**
+
+```bash
+# b4u_bmi_sbrc_tgp_MUW_out.prs
+gdown 1ByF1QSjcc0QcMp2JrMzajCfumUcbZeKV --output b4u_bmi_sbrc_tgp_MUW_out.prs
+
+# b4u_bmi_sbrc_ukb_MUW_out.prs
+gdown 1C1n0iHC3PQJgi8u-1dIQ3-t5EdeLTj5k --output b4u_bmi_sbrc_ukb_MUW_out.prs
+
+# b4u_bmi_prscs_tgp_MUW_out.prs
+gdown 1ezv1U0fA_KVIUzaJdLvvY1uNlE3zwAR2 --output b4u_bmi_prscs_tgp_MUW_out.prs
+```
+
 #### TAUH
 
 ```bash
@@ -217,6 +283,19 @@ gdown 1pQy6MeNmYwHaw8MayOb4aL8ed53uzRTd --output b4u_bmi_sbrc_ukb_TAUH_out.prs
 
 # b4u_bmi_prscs_tgp_TAUH_out.prs
 gdown 1EwW0n1mCszONjpk5G_n64oAfhXY1naJL --output b4u_bmi_prscs_tgp_TAUH_out.prs
+```
+
+**or if you prefer `CHR:POS:REF:ALT` SNP ID format:**
+
+```bash
+# b4u_bmi_sbrc_tgp_TAUH_out.prs
+gdown 1uHlPBguL3zEgyBUdiXfImwVMqdFfGyiS --output b4u_bmi_sbrc_tgp_TAUH_out.prs
+
+# b4u_bmi_sbrc_ukb_TAUH_out.prs
+gdown 18f8hwMaWCtjjgm4IcCchn93VSpk_MIik --output b4u_bmi_sbrc_ukb_TAUH_out.prs
+
+# b4u_bmi_prscs_tgp_TAUH_out.prs
+gdown 1AntPLNkh2n-8kz6hxcClCI3thnsZtOkS --output b4u_bmi_prscs_tgp_TAUH_out.prs
 ```
 
 #### UH
@@ -232,6 +311,19 @@ gdown 1gvT2dtRHNnY-igY5V9YL-b3kt2A1FlMD --output b4u_bmi_sbrc_ukb_UH_out.prs
 gdown 1_oRwvX6t_45Ssrby5kMuP3_4_W00O4kz --output b4u_bmi_prscs_tgp_UH_out.prs
 ```
 
+**or if you prefer `CHR:POS:REF:ALT` SNP ID format:**
+
+```bash
+# b4u_bmi_sbrc_tgp_UH_out.prs
+gdown 1B_5of5KGN655x6f2h5MujevaoDius8xs --output b4u_bmi_sbrc_tgp_UH_out.prs
+
+# b4u_bmi_sbrc_ukb_UH_out.prs
+gdown 1T8-o3cyYavUw43VIJdU64epyPPNvO2N4 --output b4u_bmi_sbrc_ukb_UH_out.prs
+
+# b4u_bmi_prscs_tgp_UH_out.prs
+gdown 1O28jpxJk11MCLHk98HXokfK0eqLleZDR --output b4u_bmi_prscs_tgp_UH_out.prs
+```
+
 #### UTARTU
 
 ```bash
@@ -245,6 +337,19 @@ gdown 1f63ZSufCM28Xx9YCrfH_PLFmKOXPHfF_ --output b4u_bmi_sbrc_ukb_UTARTU_out.prs
 gdown 1m5MVh04xtdD6-oKNGMgBpH7tNBisJohV --output b4u_bmi_prscs_tgp_UTARTU_out.prs
 ```
 
+**or if you prefer `CHR:POS:REF:ALT` SNP ID format:**
+
+```bash
+# b4u_bmi_sbrc_tgp_UTARTU_out.prs
+gdown 1jetJ-nxZgW4GqMcMSrw4J3pB_AeobOUD --output b4u_bmi_sbrc_tgp_UTARTU_out.prs
+
+# b4u_bmi_sbrc_ukb_UTARTU_out.prs
+gdown 1n9jfZxIKM5LS1v8KgYvOgv8_xzcB74oh --output b4u_bmi_sbrc_ukb_UTARTU_out.prs
+
+# b4u_bmi_prscs_tgp_UTARTU_out.prs
+gdown 1dLQNCwfV5YdStnyTbZWSfHegTn-2XwHI --output b4u_bmi_prscs_tgp_UTARTU_out.prs
+```
+
 #### VUA
 
 ```bash
@@ -256,6 +361,19 @@ gdown 1PE935x4AOGCj6zBS-87ZHzXdrNzNO7PD --output b4u_bmi_sbrc_ukb_VUA_out.prs
 
 # b4u_bmi_prscs_tgp_VUA_out.prs
 gdown 1noxG7PXk4HAyLJ8jhoW89L2b9NjcdIcG --output b4u_bmi_prscs_tgp_VUA_out.prs
+```
+
+**or if you prefer `CHR:POS:REF:ALT` SNP ID format:**
+
+```bash
+# b4u_bmi_sbrc_tgp_VUA_out.prs
+gdown 10CRMbyNqynTMf2f2Y8MdG9hyJRUZTCNS --output b4u_bmi_sbrc_tgp_VUA_out.prs
+
+# b4u_bmi_sbrc_ukb_VUA_out.prs
+gdown 1l3IcA_Y6lfKZ4XYpFuyMPDVMchYPonPN --output b4u_bmi_sbrc_ukb_VUA_out.prs
+
+# b4u_bmi_prscs_tgp_VUA_out.prs
+gdown 1KENW5OJ0DqBUM1i7breYEt4PHMg3aO9v --output b4u_bmi_prscs_tgp_VUA_out.prs
 ```
 
 ### PRS calculation
