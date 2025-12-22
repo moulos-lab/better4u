@@ -327,8 +327,9 @@ sanitizePrs <- function(prsFile,genoBase,perChr=FALSE,chrs=seq(22),chrSep="_",
 # calculations. plink2 now required for bgen input.
 # As there has been mixups reported regarding plink/plink2 usage, we try to add
 # explicit support for both.
+# ukb=TRUE controls ref-first or ref-unknown for PLINK2.
 evalPrs <- function(prsFile,covFile,trait,genoBase,perChr=FALSE,chrs=seq(22),
-    chrSep="_",iidCol=2,sum=TRUE,center=FALSE,bgen=FALSE,
+    chrSep="_",iidCol=2,sum=TRUE,center=FALSE,bgen=FALSE,ukb=FALSE,
     plink=Sys.which("plink"),plink2=Sys.which("plink2"),rc=NULL) {
     # Determine plink version(s) to use and for what purpose
     proceed <- .informAboutPlinkVersions(plink,plink2,bgen)
@@ -415,7 +416,8 @@ evalPrs <- function(prsFile,covFile,trait,genoBase,perChr=FALSE,chrs=seq(22),
                 pFile <- prsSplit[chr]
                 o <- tempfile()
                 o <- paste0(o,"_prs_",chr)
-                args <- c("--bgen",bFile,"ref-unknown --score",
+                reft <- ifelse(ukb,"ref-first","ref-unknown")
+                args <- c("--bgen",bFile,reft,"--score",
                     pFile,"1 2 3 header",
                     ifelse(sum,"cols=fid,pheno1,nallele,denom,scoresums",
                         "cols=fid,pheno1,nallele,denom,scoreavgs"),
@@ -472,7 +474,8 @@ evalPrs <- function(prsFile,covFile,trait,genoBase,perChr=FALSE,chrs=seq(22),
         if (bgen) {
             message("Calculating score with PLINK 2.0 --score")
             bgenFile <- paste0(genoBase,".bgen")
-            args <- c("--bgen",bgenFile,"ref-unknown --score",
+            reft <- ifelse(ukb,"ref-first","ref-unknown")
+            args <- c("--bgen",bgenFile,reft,"--score",
                 prsFile,"1 2 3 header",
                 ifelse(sum,"cols=fid,pheno1,nallele,denom,scoresums",
                     "cols=fid,pheno1,nallele,denom,scoreavgs"),
