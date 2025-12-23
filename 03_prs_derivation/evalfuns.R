@@ -154,8 +154,9 @@ formatPrs <- function(prsFile,outFile,from=c("sbayesrc","prscs"),pip=0.001) {
 # if perChr, BIM files are assumed one per chromosome for chrs variable
 # We accept only ending in *{chrSep}{chr}.bim, so if genoBase="COHORT" and
 # chrSep="_" then the bim file is COHORT_chr1.bim
+# ukb: sanitization against UKB
 sanitizePrs <- function(prsFile,genoBase,perChr=FALSE,chrs=seq(22),chrSep="_",
-    bgen=FALSE,from=c("sbayesrc","prscs","ready"),pip=0.001,
+    bgen=FALSE,ukb=FALSE,from=c("sbayesrc","prscs","ready"),pip=0.001,
     plink2=Sys.which("plink2"),rc=NULL) {
     if (bgen && !(is.character(plink2) || file.exists(plink2))) 
         stop("PLINK 2.0 is required by sanitizePrs() if you have bgen files!")
@@ -193,8 +194,14 @@ sanitizePrs <- function(prsFile,genoBase,perChr=FALSE,chrs=seq(22),chrSep="_",
                 message("Converting to BIM with PLINK 2.0 for ",chr)
                 bFile <- paste0(genoBase,chrSep,"chr",chr,".bgen")
                 o <- tempfile()
+                # If UKB, ref-first and a .sample file are required
+                bgenArgs <- "ref-unknown"
+                if (ukb) {
+                    sFile <- paste0(genoBase,chrSep,"chr",chr,".sample")
+                    bgenArgs <- paste0("ref-first --sample ",sFile)
+                }
                 # ref-unknown, sanitization will take care if problem
-                args <- c("--bgen",bFile,"ref-unknown --make-just-bim",
+                args <- c("--bgen",bFile,bgenArgs,"--make-just-bim",
                     "--out",o,"--silent") 
                 out <- tryCatch({
                     suppressWarnings(system2(plink2,args=args))
@@ -218,7 +225,12 @@ sanitizePrs <- function(prsFile,genoBase,perChr=FALSE,chrs=seq(22),chrSep="_",
             message("Converting to BIM with PLINK 2.0")
             bFile <- paste0(genoBase,".bgen")
             o <- tempfile()
-            args <- c("--bgen",bFile,"ref-unknown --make-just-bim --out",o,
+            bgenArgs <- "ref-unknown"
+            if (ukb) {
+                sFile <- paste0(genoBase,".sample")
+                bgenArgs <- paste0("ref-first --sample ",sFile)
+            }
+            args <- c("--bgen",bFile,bgenArgs,"--make-just-bim --out",o,
                 "--silent")
             out <- tryCatch({
                 suppressWarnings(system2(plink2,args=args))
@@ -416,8 +428,13 @@ evalPrs <- function(prsFile,covFile,trait,genoBase,perChr=FALSE,chrs=seq(22),
                 pFile <- prsSplit[chr]
                 o <- tempfile()
                 o <- paste0(o,"_prs_",chr)
-                reft <- ifelse(ukb,"ref-first","ref-unknown")
-                args <- c("--bgen",bFile,reft,"--score",
+                # If UKB, ref-first and a .sample file are required
+                bgenArgs <- "ref-unknown"
+                if (ukb) {
+                    sFile <- paste0(genoBase,chrSep,"chr",chr,".sample")
+                    bgenArgs <- paste0("ref-first --sample ",sFile)
+                }
+                args <- c("--bgen",bFile,bgenArgs,"--score",
                     pFile,"1 2 3 header",
                     ifelse(sum,"cols=fid,pheno1,nallele,denom,scoresums",
                         "cols=fid,pheno1,nallele,denom,scoreavgs"),
@@ -474,8 +491,12 @@ evalPrs <- function(prsFile,covFile,trait,genoBase,perChr=FALSE,chrs=seq(22),
         if (bgen) {
             message("Calculating score with PLINK 2.0 --score")
             bgenFile <- paste0(genoBase,".bgen")
-            reft <- ifelse(ukb,"ref-first","ref-unknown")
-            args <- c("--bgen",bgenFile,reft,"--score",
+            bgenArgs <- "ref-unknown"
+            if (ukb) {
+                sFile <- paste0(genoBase,".sample")
+                bgenArgs <- paste0("ref-first --sample ",sFile)
+            }
+            args <- c("--bgen",bgenFile,bgenArgs,"--score",
                 prsFile,"1 2 3 header",
                 ifelse(sum,"cols=fid,pheno1,nallele,denom,scoresums",
                     "cols=fid,pheno1,nallele,denom,scoreavgs"),
