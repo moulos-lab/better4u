@@ -364,7 +364,11 @@ evalPrs <- function(prsFile,covFile,trait,genoBase,perChr=FALSE,chrs=seq(22),
     
     # Align with genotypes
     if (bgen) {
-        fam <- read.table(paste0(genoBase,".sample"),header=TRUE)
+        if (perChr)
+            fam <- read.table(paste0(genoBase,chrSep,"chr",chrs[1],".sample"),
+                header=TRUE)
+        else
+            fam <- read.table(paste0(genoBase,".sample"),header=TRUE)
         fam <- fam[-1,,drop=FALSE]
     }
     else
@@ -392,6 +396,9 @@ evalPrs <- function(prsFile,covFile,trait,genoBase,perChr=FALSE,chrs=seq(22),
         covars <- covars[,-which(colnames(covars)=="FID")]
     if ("IID" %in% colnames(covars))
         covars <- covars[,-which(colnames(covars)=="IID")]
+    # UKB case
+    if ("eid" %in% colnames(covars) || "EID" %in% colnames(covars))
+        covars <- covars[,-which(colnames(covars) %in% c("EID","eid"))]
     
     # Ready to run plink --score. If plink found or properly provided, run 
     # --score and exclude samples if required.
