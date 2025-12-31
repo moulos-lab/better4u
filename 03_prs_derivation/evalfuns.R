@@ -155,9 +155,10 @@ formatPrs <- function(prsFile,outFile,from=c("sbayesrc","prscs"),pip=0.001) {
 # We accept only ending in *{chrSep}{chr}.bim, so if genoBase="COHORT" and
 # chrSep="_" then the bim file is COHORT_chr1.bim
 # ukb: sanitization against UKB
+# permaBim: if bgen, store the converted BIM permanently instead of temp file
 sanitizePrs <- function(prsFile,genoBase,perChr=FALSE,chrs=seq(22),chrSep="_",
-    bgen=FALSE,ukb=FALSE,from=c("sbayesrc","prscs","ready"),pip=0.001,
-    plink2=Sys.which("plink2"),rc=NULL) {
+    bgen=FALSE,ukb=FALSE,permaBim=FALSE,from=c("sbayesrc","prscs","ready"),
+    pip=0.001,plink2=Sys.which("plink2"),rc=NULL) {
     if (bgen && !(is.character(plink2) || file.exists(plink2))) 
         stop("PLINK 2.0 is required by sanitizePrs() if you have bgen files!")
         
@@ -193,7 +194,8 @@ sanitizePrs <- function(prsFile,genoBase,perChr=FALSE,chrs=seq(22),chrSep="_",
             bims <- cmclapply(chrs,function(chr) {
                 message("Converting to BIM with PLINK 2.0 for ",chr)
                 bFile <- paste0(genoBase,chrSep,"chr",chr,".bgen")
-                o <- tempfile()
+                o <- ifelse(permaBim,paste0(genoBase,chrSep,"chr",chr),
+                    tempfile())
                 # If UKB, ref-first and a .sample file are required
                 bgenArgs <- "ref-unknown"
                 if (ukb) {
@@ -224,7 +226,7 @@ sanitizePrs <- function(prsFile,genoBase,perChr=FALSE,chrs=seq(22),chrSep="_",
         else {
             message("Converting to BIM with PLINK 2.0")
             bFile <- paste0(genoBase,".bgen")
-            o <- tempfile()
+            o <- ifelse(permaBim,genoBase,tempfile())
             bgenArgs <- "ref-unknown"
             if (ukb) {
                 sFile <- paste0(genoBase,".sample")
@@ -340,12 +342,22 @@ sanitizePrs <- function(prsFile,genoBase,perChr=FALSE,chrs=seq(22),chrSep="_",
 # As there has been mixups reported regarding plink/plink2 usage, we try to add
 # explicit support for both.
 # ukb=TRUE controls ref-first or ref-unknown for PLINK2.
+# If you wish to keep the file with non-mathcing samples to be removed, give a
+# filename to remFile
 evalPrs <- function(prsFile,covFile,trait,genoBase,perChr=FALSE,chrs=seq(22),
-    chrSep="_",iidCol=2,sum=TRUE,center=FALSE,bgen=FALSE,ukb=FALSE,
+    chrSep="_",iidCol=2,sum=TRUE,center=FALSE,bgen=FALSE,ukb=FALSE,remFile=NULL,
     plink=Sys.which("plink"),plink2=Sys.which("plink2"),rc=NULL) {
     # Determine plink version(s) to use and for what purpose
     proceed <- .informAboutPlinkVersions(plink,plink2,bgen)
     if (!proceed) return()
+    
+    if (!is.null(remFile) && !is.character(remFile)) {
+        warning("remFile is not a proper file name! A temp file will be used.",
+            immediate.=TRUE)
+        remFile <- NULL
+    }
+    if (is.null(remFile))
+        remFile <- tempfile()
     
     # Base name for plink score output
     prsName <- sub("\\.[^.]*$","",prsFile)
@@ -380,11 +392,9 @@ evalPrs <- function(prsFile,covFile,trait,genoBase,perChr=FALSE,chrs=seq(22),
     # remaining fam. If all fam included in common, again, no problem this way
     covars <- covars[common,,drop=FALSE]
     # Continue with fam check
-    remFile <- NULL
     if (length(common) < nrow(fam)) { # Can be only smaller or equal
         # File for removal of samples in plink --score
         remove <- setdiff(rownames(fam),common)
-        remFile <- tempfile()
         write.table(fam[remove,c(1,2),drop=FALSE],file=remFile,col.names=FALSE,
             row.names=FALSE,quote=FALSE)
         # Nothing to do, covars already aligned with common
@@ -442,7 +452,7 @@ evalPrs <- function(prsFile,covFile,trait,genoBase,perChr=FALSE,chrs=seq(22),
                     bgenArgs <- paste0("ref-first --sample ",sFile)
                 }
                 args <- c("--bgen",bFile,bgenArgs,"--score",
-                    pFile,"1 2 3 header",
+                    pFile,"1 2 3 header ignore-dup-ids",
                     ifelse(sum,"cols=fid,pheno1,nallele,denom,scoresums",
                         "cols=fid,pheno1,nallele,denom,scoreavgs"),
                 ifelse(center,"center",""),"--out",o)
@@ -504,7 +514,7 @@ evalPrs <- function(prsFile,covFile,trait,genoBase,perChr=FALSE,chrs=seq(22),
                 bgenArgs <- paste0("ref-first --sample ",sFile)
             }
             args <- c("--bgen",bgenFile,bgenArgs,"--score",
-                prsFile,"1 2 3 header",
+                prsFile,"1 2 3 header ignore-dup-ids",
                 ifelse(sum,"cols=fid,pheno1,nallele,denom,scoresums",
                     "cols=fid,pheno1,nallele,denom,scoreavgs"),
                 ifelse(center,"center",""),"--out",prsName)
