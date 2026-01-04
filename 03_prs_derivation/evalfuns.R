@@ -426,20 +426,14 @@ evalPrs <- function(prsFile,covFile,trait,genoBase,perChr=FALSE,chrs=seq(22),
     if (perChr) {
         # Firstly split prsFile into files per chromosome. It should be 
         # sanitized so it has 4 columns, the 4th is chromosome.
-        tmpPrs <- read.delim(prsFile)
-        tmpSplit <- split(tmpPrs,tmpPrs$CHR)
-        prsSplit <- unlist(cmclapply(names(tmpSplit),function(chr) {
-            o <- tempfile()
-            o <- paste0(o,"_",chr)
-            write.table(tmpSplit[[chr]][,1:3],file=o,sep="\t",row.names=FALSE,
-                quote=FALSE)
-            return(o)
-        },rc=rc))
-        names(prsSplit) <- names(tmpSplit)
+        prsSplit <- .splitPrsPerChr(prsFile)
         
         # Now calculate scores per chromosome
         if (bgen) {
-            scoreFiles <- unlist(cmclapply(chrs,function(chr) {
+            # For some internal PLINK2 reason, parallelization does not work
+            # at all as expected...
+            #scoreFiles <- unlist(cmclapply(chrs,function(chr) {
+            scoreFiles <- unlist(lapply(chrs,function(chr) {
                 message("Calculating score with PLINK 2.0 --score for ",chr)
                 bFile <- paste0(genoBase,chrSep,"chr",chr,".bgen")
                 pFile <- prsSplit[chr]
@@ -458,7 +452,9 @@ evalPrs <- function(prsFile,covFile,trait,genoBase,perChr=FALSE,chrs=seq(22),
                 ifelse(center,"center",""),"--out",o)
                 if (!is.null(remFile))
                     args <- c(args,"--remove",remFile)
-                args <- c(args,"--silent")
+                #args <- c(args,"--silent") # Not needed for linear execution
+                humanCommand <- .formatPlinkCommand(plink2,args)
+                message("Executing:\n",humanCommand)
                 out <- tryCatch({
                     suppressWarnings(system2(plink2,args=args))
                     TRUE
@@ -467,7 +463,7 @@ evalPrs <- function(prsFile,covFile,trait,genoBase,perChr=FALSE,chrs=seq(22),
                     return(FALSE)
                 },finally="")
                 return(paste0(o,".sscore"))
-            },rc=rc))
+            }))
         }
         else {
             scoreFiles <- unlist(cmclapply(chrs,function(chr) {
@@ -481,6 +477,8 @@ evalPrs <- function(prsFile,covFile,trait,genoBase,perChr=FALSE,chrs=seq(22),
                 if (!is.null(remFile))
                     args <- c(args,"--remove",remFile)
                 args <- c(args,"--silent")
+                humanCommand <- .formatPlinkCommand(plink,args)
+                message("Executing:\n",humanCommand)
                 out <- tryCatch({
                     suppressWarnings(system2(plink,args=args))
                     TRUE
@@ -520,7 +518,9 @@ evalPrs <- function(prsFile,covFile,trait,genoBase,perChr=FALSE,chrs=seq(22),
                 ifelse(center,"center",""),"--out",prsName)
             if (!is.null(remFile))
                 args <- c(args,"--remove",remFile)
-            args <- c(args,"--silent")
+            #args <- c(args,"--silent")
+            humanCommand <- .formatPlinkCommand(plink2,args)
+            message("Executing:\n",humanCommand)
             out <- tryCatch({
                 suppressWarnings(system2(plink2,args=args))
                 TRUE
@@ -543,7 +543,9 @@ evalPrs <- function(prsFile,covFile,trait,genoBase,perChr=FALSE,chrs=seq(22),
                 ifelse(sum,"sum",""),ifelse(center,"center",""),"--out",prsName)
             if (!is.null(remFile))
                 args <- c(args,"--remove",remFile)
-            args <- c(args,"--silent")
+            #args <- c(args,"--silent")
+            humanCommand <- .formatPlinkCommand(plink,args)
+            message("Executing:\n",humanCommand)
             out <- tryCatch({
                 suppressWarnings(system2(plink,args=args))
                 TRUE
@@ -628,7 +630,7 @@ evalPrs <- function(prsFile,covFile,trait,genoBase,perChr=FALSE,chrs=seq(22),
     prs <- pcovars[,ncol(pcovars)]
     covs <- pcovars[,-c(ii,ncol(pcovars))]
     g_covs <- nong_covs <- NULL
-    hasPC <- grepl("^PC",names(covs),perl=TRUE)
+    hasPC <- grepl("^(PC|genetic_principal)",names(covs),perl=TRUE)
     if (any(hasPC)) {
         g_covs <- covs[,hasPC,drop=FALSE]
         nong_covs <- covs[,!hasPC,drop=FALSE]
@@ -694,6 +696,22 @@ directR2 <- function(y,prs,nong_covs=NULL,g_covs=NULL,resid_both=FALSE) {
     }
 }
 
+.splitPrsPerChr <- function(prsFile,outBase=NULL) {
+    message("Reading ",prsFile)
+    tmpPrs <- read.delim(prsFile)
+    tmpSplit <- split(tmpPrs,tmpPrs$CHR)
+    message("Splitting ",prsFile)
+    prsSplit <- unlist(cmclapply(names(tmpSplit),function(chr) {
+        o <- ifelse(is.null(outBase),tempfile(),outBase)
+        o <- paste0(o,"_chr",chr,".prs")
+        write.table(tmpSplit[[chr]][,1:3],file=o,sep="\t",row.names=FALSE,
+            quote=FALSE)
+        return(o)
+    },rc=rc))
+    names(prsSplit) <- names(tmpSplit)
+    return(prsSplit)
+}
+        
 cmclapply <- function(...,rc) {
     if (suppressWarnings(!requireNamespace("parallel")) 
         || .Platform$OS.type!="unix")
@@ -776,6 +794,16 @@ cmclapply <- function(...,rc) {
         return(FALSE)
     }
 }
+
+.formatPlinkCommand <- function(plink,args) {
+    init <- paste0(plink," ",paste(args,collapse=" "))
+    tmp <- strsplit(init," --")[[1]]
+    tmp <- trimws(tmp)
+    fin <- c(tmp[1],paste("  --",tmp[2:length(tmp)],sep=""))
+    fin[1:(length(fin)-1)] <- paste(fin[1:(length(fin)-1)]," \\\n",sep="")
+    return(fin)
+}
+
 ################################################################################
 
 # Solve for lambda so that P(|epsilon| < z * SE) = targetProb where 
