@@ -426,7 +426,7 @@ evalPrs <- function(prsFile,covFile,trait,genoBase,perChr=FALSE,chrs=seq(22),
     if (perChr) {
         # Firstly split prsFile into files per chromosome. It should be 
         # sanitized so it has 4 columns, the 4th is chromosome.
-        prsSplit <- .splitPrsPerChr(prsFile)
+        prsSplit <- .splitPrsPerChr(prsFile,rc=rc)
         
         # Now calculate scores per chromosome
         if (bgen) {
@@ -696,7 +696,7 @@ directR2 <- function(y,prs,nong_covs=NULL,g_covs=NULL,resid_both=FALSE) {
     }
 }
 
-.splitPrsPerChr <- function(prsFile,outBase=NULL) {
+.splitPrsPerChr <- function(prsFile,outBase=NULL,rc=NULL) {
     message("Reading ",prsFile)
     tmpPrs <- read.delim(prsFile)
     tmpSplit <- split(tmpPrs,tmpPrs$CHR)
