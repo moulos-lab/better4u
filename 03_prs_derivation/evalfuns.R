@@ -434,7 +434,7 @@ evalPrs <- function(prsFile,covFile,trait,genoBase,perChr=FALSE,chrs=seq(22),
             # at all as expected...
             #scoreFiles <- unlist(cmclapply(chrs,function(chr) {
             scoreFiles <- unlist(lapply(chrs,function(chr) {
-                message("Calculating score with PLINK 2.0 --score for ",chr)
+                message("\nCalculating score with PLINK 2.0 --score for ",chr)
                 bFile <- paste0(genoBase,chrSep,"chr",chr,".bgen")
                 pFile <- prsSplit[chr]
                 o <- tempfile()
@@ -467,7 +467,7 @@ evalPrs <- function(prsFile,covFile,trait,genoBase,perChr=FALSE,chrs=seq(22),
         }
         else {
             scoreFiles <- unlist(cmclapply(chrs,function(chr) {
-                message("Calculating score with PLINK 1.9 --score for ",chr)
+                message("\nCalculating score with PLINK 1.9 --score for ",chr)
                 bFile <- paste0(genoBase,chrSep,"chr",chr)
                 pFile <- prsSplit[chr]
                 o <- tempfile()
@@ -504,7 +504,7 @@ evalPrs <- function(prsFile,covFile,trait,genoBase,perChr=FALSE,chrs=seq(22),
     }
     else {
         if (bgen) {
-            message("Calculating score with PLINK 2.0 --score")
+            message("\nCalculating score with PLINK 2.0 --score")
             bgenFile <- paste0(genoBase,".bgen")
             bgenArgs <- "ref-unknown"
             if (ukb) {
@@ -538,7 +538,7 @@ evalPrs <- function(prsFile,covFile,trait,genoBase,perChr=FALSE,chrs=seq(22),
                 comment.char="")
         }
         else {
-            message("Calculating score with PLINK 1.9 --score")
+            message("\nCalculating score with PLINK 1.9 --score")
             args <- c("--bfile",genoBase,"--score",prsFile,"1 2 3 header",
                 ifelse(sum,"sum",""),ifelse(center,"center",""),"--out",prsName)
             if (!is.null(remFile))
@@ -562,7 +562,7 @@ evalPrs <- function(prsFile,covFile,trait,genoBase,perChr=FALSE,chrs=seq(22),
             theScore <- read.table(scoreFile,row.names=2,header=TRUE)
         }
     }
-        
+
     # ...and prepare metrics, regressions
     ii <- which(colnames(covars)==trait)
     colnames(covars) <- make.names(colnames(covars))
