@@ -191,8 +191,9 @@ sanitizePrs <- function(prsFile,genoBase,perChr=FALSE,chrs=seq(22),chrSep="_",
     # Read SNP data (bim) and initial PRS
     if (bgen) {
         if (perChr) {
-            bims <- cmclapply(chrs,function(chr) {
-                message("Converting to BIM with PLINK 2.0 for ",chr)
+            #bims <- cmclapply(chrs,function(chr) {
+            bims <- lapply(chrs,function(chr) {
+                message("\nConverting to BIM with PLINK 2.0 for ",chr)
                 bFile <- paste0(genoBase,chrSep,"chr",chr,".bgen")
                 o <- ifelse(permaBim,paste0(genoBase,chrSep,"chr",chr),
                     tempfile())
@@ -204,7 +205,9 @@ sanitizePrs <- function(prsFile,genoBase,perChr=FALSE,chrs=seq(22),chrSep="_",
                 }
                 # ref-unknown, sanitization will take care if problem
                 args <- c("--bgen",bFile,bgenArgs,"--make-just-bim",
-                    "--out",o,"--silent") 
+                    "--out",o)#,"--silent") 
+                humanCommand <- .formatPlinkCommand(plink2,args)
+                message("Executing:\n",humanCommand)
                 out <- tryCatch({
                     suppressWarnings(system2(plink2,args=args))
                     TRUE
@@ -220,11 +223,12 @@ sanitizePrs <- function(prsFile,genoBase,perChr=FALSE,chrs=seq(22),chrSep="_",
                 message("Reading converted BIM for ",chr)
                 bim <- read.delim(paste0(o,".bim"),header=FALSE)
                 return(bim)
-            },rc=rc)
+            #},rc=rc)
+            })
             bim <- do.call("rbind",bims)
         }
         else {
-            message("Converting to BIM with PLINK 2.0")
+            message("\nConverting to BIM with PLINK 2.0")
             bFile <- paste0(genoBase,".bgen")
             o <- ifelse(permaBim,genoBase,tempfile())
             bgenArgs <- "ref-unknown"
