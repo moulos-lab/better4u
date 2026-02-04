@@ -403,8 +403,10 @@ evalPrs <- function(prsFile,covFile,trait,genoBase,perChr=FALSE,chrs=seq(22),
             row.names=FALSE,quote=FALSE)
         # Nothing to do, covars already aligned with common
     }
-    else # All found, final align the covars based on fam
+    else { # All found, final align the covars based on fam
         covars <- covars[rownames(fam),]
+        remFile <- NULL
+    }
     # Remove IID, FID from covars now, not needed and will affect later GLM
     if ("FID" %in% colnames(covars))
         covars <- covars[,-which(colnames(covars)=="FID")]

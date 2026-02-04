@@ -1876,6 +1876,35 @@ nohup gctb \
   > $WORKSPACE/work/PRS/baseline/b4u_ukb_gctb.log 2>&1 &
 ```
 
+### Basic filtering of GCTB SBayesRC derived PRS
+
+The GCTB SBayesRC PRS file has the format:
+
+```
+ Index                 Name  Chrom     Position     A1     A2        A1Frq     A1Effect           SE VarExplained          PEP          Pi1          Pi2          Pi3          Pi4          Pi5            PIP
+     1           rs12565286      1       721290      C      G     0.045726     0.000000     0.000000 0.000000e+00     0.000000     0.994805     0.004617     0.000549     0.000029     0.000000      0.0051949
+     2            rs3094315      1       752566      A      G     0.839960     0.000140     0.002029 4.040904e-08     0.005000     0.995331     0.004260     0.000391     0.000017     0.000000     0.00466907
+...
+```
+
+We keep the Chromosome, Name, A1, A1Effect, SE (for later introducing noise),
+PIP and remove SNPs with zero effect. We process both 1000 genomes EUR LD and
+built-in UKB derived PRS:
+
+```
+# 1000 genomes
+awk 'NR==1 { print "CHR\tSNP\tA1\tBETA\tSE\tPIP" } 
+     NR>1 && $8 != 0 { print $3"\t"$2"\t"$5"\t"$8"\t"$9"\t"$17 }' \
+  $WORKSPACE/work/PRS/baseline/b4u_tgp_gctb.snpRes > \
+  $WORKSPACE/work/PRS/baseline/b4u_tgp_gctb.snpRes.prs
+
+# Built-in
+awk 'NR==1 { print "CHR\tSNP\tA1\tBETA\tSE\tPIP" } 
+     NR>1 && $8 != 0 { print $3"\t"$2"\t"$5"\t"$8"\t"$9"\t"$17 }' \
+  $WORKSPACE/work/PRS/baseline/b4u_ukb_gctb.snpRes > \
+  $WORKSPACE/work/PRS/baseline/b4u_ukb_gctb.snpRes.prs
+```
+
 ### Conversion of METAL to PRS-CS expected format
 
 PRS-CS works with the following summary statistics format:
@@ -2099,6 +2128,232 @@ Then we run it:
 
 ```bash
 nohup bash run_prscs_bootstrap.sh > bootstrap.log &
+```
+
+### Evaluation of the bootstrap process
+
+The R code below is used to post-process the outcome of the PRS-CS iterations.
+
+```R
+WORKSPACE <- Sys.getenv("WORKSPACE")
+
+BOOTSPACE <- file.path(WORKSPACE,"work","PRS","bootstrap")
+
+source(file.path(WORKSPACE,"resources","better4u","03_prs_derivation",
+    "evalfuns.R"))
+    
+# Create map of A1 alleles and chromosomes
+mainPrsFile <- file.path(WORKSPACE,"work","PRS","baseline",
+    "b4u_tgp_prscs_pst_eff_a1_b0.5_phiauto.txt")
+mainPrs <- read.delim(mainPrsFile,header=FALSE)
+orgBetas <- mainPrs[,6]
+names(orgBetas) <- mainPrs[,2]
+
+mapFile <- read.delim("0001/b4u_tgp_prscs_sim_pst_eff_a1_b0.5_phiauto.txt",
+    header=FALSE)
+A1s <- mapFile[,4]
+chroms <- mapFile[,1]
+names(A1s) <- names(chroms) <- mapFile[,2]
+
+# Create list of iteration PRSs based on BETA
+beps <- 1e-5 #BETA filter - remove very small effects
+iters <- seq(1000)
+freq <- 950 # Keep SNPs appearing at least 951-1000 times
+N <- length(iters)
+
+# Read and filter PRS files
+collection <- cmclapply(iters,function(i) {
+    # Read the data
+    message("Reading iteration ",i)
+    runDir <- file.path(BOOTSPACE,sprintf("%04d",i))
+    iterPrsFile <- file.path(runDir,
+        "b4u_tgp_prscs_sim_pst_eff_a1_b0.5_phiauto.txt")
+    prePrs <- read.delim(iterPrsFile,header=FALSE)
+    colnames(prePrs) <- c("CHR","SNP","BP","A1","A2","BETA")
+    rownames(prePrs) <- prePrs$SNP
+    return(prePrs[abs(prePrs$BETA)>=beps,])
+},rc=1)
+
+# Create the candidates pool
+snpPool <- lapply(collection,function(x) return(x$SNP))
+preCandidates <- table(unlist(snpPool)) # Long time
+candidates <- names(preCandidates[preCandidates>freq])
+
+# Get matrices of alleles, for sanity check - once
+#a1s <- a2s <- matrix(NA,length(preCandidates),N)
+#rownames(a1s) <- rownames(a2s) <- names(preCandidates)
+#for (i in 1:N) {
+#   message("Assigning alleles for iter ",i)
+#   a1s[rownames(collection[[i]]),i] <- collection[[i]]$A1
+#   a2s[rownames(collection[[i]]),i] <- collection[[i]]$A2
+#}
+## Sanity check for allele alignment - all OK
+#a1 <- apply(a1s,1,function(r) {
+#   if (any(is.na(r)))
+#       r <- r[!is.na(r)]
+#   return(all(r==r[1]))
+#})
+#a2 <- apply(a2s,1,function(r) {
+#   if (any(is.na(r)))
+#       r <- r[!is.na(r)]
+#   return(all(r==r[1]))
+#})
+
+# Create a matrix of betas
+betas <- matrix(0,length(preCandidates),N)
+rownames(betas) <- names(preCandidates)
+for (i in 1:N) {
+    message("Assigning effects for iter ",i)
+    betas[rownames(collection[[i]]),i] <- collection[[i]]$BETA
+}
+
+# Gather required betas
+bmean <- apply(betas,1,function(x) {
+    return(mean(x[x!=0]))
+})
+bmedian <- apply(betas,1,function(x) {
+    return(median(x[x!=0]))
+})
+bmeanSel <- bmean[candidates]
+bmedianSel <- bmedian[candidates]
+
+# Construct score files
+meanApproach <- data.frame(
+    SNP=names(bmeanSel),
+    A1=A1s[names(bmeanSel)],
+    BETA=bmeanSel,
+    CHR=chroms[names(bmeanSel)]
+)
+medianApproach <- data.frame(
+    SNP=names(bmedianSel),
+    A1=A1s[names(bmedianSel)],
+    BETA=bmedianSel,
+    CHR=chroms[names(bmedianSel)]
+)
+orgApproach <- data.frame(
+    SNP=names(bmeanSel),
+    A1=A1s[names(bmeanSel)],
+    BETA=orgBetas[names(bmeanSel)],
+    CHR=chroms[names(bmeanSel)]
+)
+
+# Write output
+write.table(meanApproach,file=file.path(BOOTSPACE,"mean_approach.prs"),sep="\t",
+    row.names=FALSE,quote=FALSE)
+write.table(medianApproach,file=file.path(BOOTSPACE,"median_approach.prs"),
+    sep="\t",row.names=FALSE,quote=FALSE)
+write.table(orgApproach,file=file.path(BOOTSPACE,"org_approach.prs"),
+    sep="\t",row.names=FALSE,quote=FALSE)
+
+# Required for distribution
+orgApproachMore <- data.frame(
+    CHR=chroms[names(bmeanSel)],
+    SNP=names(bmeanSel),
+    A1=A1s[names(bmeanSel)],
+    BETA=orgBetas[names(bmeanSel)],
+    SE=0,
+    PIP=0.001
+)
+orgApproachMore <- orgApproachMore[order(orgApproachMore$CHR,orgApproachMore$SNP),]
+write.table(orgApproachMore,file=file.path(BOOTSPACE,"org_approach_dist.prs"),
+    sep="\t",row.names=FALSE,quote=FALSE)
+```
+
+The initial plan does not seem to work as expected. We have indetified though
+a set of robust SNPs. We retrain a PRS-CS PRS based on these:
+
+```R
+# Write a BIM file with robust SNPs for PRS-CS realignment
+snpinfo <- read.delim(file.path(WORKSPACE,"work","METAL","metal_b4u.bim"),
+    header=FALSE)
+rownames(snpinfo) <- snpinfo[,2]
+robim <- data.frame(
+    meanApproach$CHR,
+    meanApproach$SNP,
+    0,
+    snpinfo[meanApproach$SNP,4],
+    snpinfo[meanApproach$SNP,5],
+    snpinfo[meanApproach$SNP,6]
+)
+robim <- robim[order(robim[,1],robim[,4]),]
+write.table(robim,file=file.path(BOOTSPACE,"robust.bim"),sep="\t",quote=FALSE,
+    row.names=FALSE,col.names=FALSE)
+```
+
+and then, we retrain PRS-CS with the robust SNPs
+
+```bash
+FINALSPACE=$WORKSPACE/work/PRS/final
+mkdir $FINALSPACE
+
+nohup python $WORKSPACE/resources/PRScs/PRScs.py \
+  --ref_dir=$WORKSPACE/resources/PRScsxLD/ldblk_1kg_eur \
+  --bim_prefix=$WORKSPACE/work/PRS/bootstrap/robust \
+  --sst_file=$WORKSPACE/work/METAL/metal_b4u.csx \
+  --n_gwas=61432 \
+  --out_dir=$FINALSPACE/b4u_tgp_prscs_robust \
+  > $FINALSPACE/b4u_tgp_prscs_robust.log 2>&1 &
+  
+wait
+
+cd $FINALSPACE
+for i in {1..22}; 
+do
+  cat b4u_tgp_prscs_robust_pst_eff_a1_b0.5_phiauto_chr${i}.txt
+done > b4u_tgp_prscs_robust_pst_eff_a1_b0.5_phiauto.txt
+```
+
+### Create BMI change PRS files for distribution
+
+Finally, we distribute for evaluation the following cases:
+
+* GCTB SBayesRC with 1000 genomes EUR LD panel
+* GCTB SBayesRC with 1000 genomes UKB LD panel
+* PRS-CS original version with BETTER4U BIM and EUR LD panel
+* PRS-CS robust version with BETTER4U, EUR LD panel and original weights
+* PRS-CS recalibrated version with BETTER4U BIM and EUR LD panel
+
+The following R code creates the files to be distributed:
+
+```R
+WORKSPACE <- Sys.getenv("WORKSPACE")
+
+source(file.path(WORKSPACE,"resources","better4u","03_prs_derivation",
+    "evalfuns.R"))
+
+DISTSPACE <- file.path(WORKSPACE,"work","PRS","distribute")
+if (!dir.exists(DISTSPACE))
+    dir.create(DISTSPACE,recursive=TRUE,showWarnings=FALSE)
+
+# Format GCTB SBayesRC with 1000 genomes LD panel
+prePrsFile <- file.path(WORKSPACE,"work","PRS","baseline",
+    "b4u_tgp_gctb.snpRes.prs")
+prsFile <- file.path(DISTSPACE,"b4u_wc_sbrc_tgp.prs")
+prsFile <- formatPrs(prePrsFile,prsFile,from="sbayesrc")
+
+# Format GCTB SBayesRC with UKB LD panel
+prePrsFile <- file.path(WORKSPACE,"work","PRS","baseline",
+    "b4u_ukb_gctb.snpRes.prs")
+prsFile <- file.path(DISTSPACE,"b4u_wc_sbrc_ukb.prs")
+prsFile <- formatPrs(prePrsFile,prsFile,from="sbayesrc")
+
+# Format PRS-CS original (EUR LD panel, B4U BIM)
+prePrsFile <- file.path(WORKSPACE,"work","PRS","baseline", 
+    "b4u_tgp_prscs_pst_eff_a1_b0.5_phiauto.txt")
+prsFile <- file.path(DISTSPACE,"b4u_wc_prscs_original.prs")
+prsFile <- formatPrs(prePrsFile,prsFile,from="prscs")
+
+# PRS-CS robust (EUR LD panel, B4U BIM) - already formatted from above
+prePrsFile <- file.path(WORKSPACE,"work","PRS","bootstrap", 
+    "org_approach_dist.prs")
+prsFile <- file.path(DISTSPACE,"b4u_wc_prscs_robust.prs")
+file.copy(from=prePrsFile,to=prsFile)
+
+# Format PRS-CS recalibrated (EUR LD panel, B4U BIM)
+prePrsFile <- file.path(WORKSPACE,"work","PRS","final", 
+    "b4u_tgp_prscs_robust_pst_eff_a1_b0.5_phiauto.txt")
+prsFile <- file.path(DISTSPACE,"b4u_wc_prscs_recalibrated.prs")
+prsFile <- formatPrs(prePrsFile,prsFile,from="prscs")
 ```
 
 ## Leave-One-Out analysis for BETTER4U PRS cohorts
@@ -2651,7 +2906,7 @@ Rscript \
     for (looD in dirs) {
         message("Processing SNPs from ",looD)
         
-        message("  Geting SNPs")
+        message("  Getting SNPs")
         # Present SNPs
         pr <- intersect(rownames(prePrsFile_GCTB_TGP[[looD]]),snps_1_g5)
         # Absent SNPs
@@ -2740,7 +2995,98 @@ Rscript \
         outFile <- file.path(WORKSPACE,"work","BMI","LOO",looD,"PRS",outName)
         write.table(prsdf,file=outFile,quote=FALSE,sep="\t",row.names=FALSE)
     }
-  }
+  }'
+```
+
+### Derivation of consensus PRS versions
+
+The following R script reads the LOO versions of the PRSs produced and averages
+the betas to produce a LOO-consensus PRS:
+
+```r
+Rscript \
+  -e '{
+    WORKSPACE <- Sys.getenv("WORKSPACE")
+
+    pwd <- getwd()
+    setwd(file.path(WORKSPACE,"work","BMI","LOO"))
+
+    dirs <- dir()
+    gctb_tgp <- gctb_ukb <- prscs_tgp <- vector("list",length(dirs))
+    names(gctb_tgp) <- names(gctb_ukb) <- names(prscs_tgp) <- dirs
+    
+    ## Build GCTB TGP consensus score
+    # 1. Read in cohorts in a list
+    for (looD in dirs) {
+        message("Reading GCTB TGP PRS from ",looD)
+        inName <- paste0("b4u_bmi_sbrc_tgp_",looD,".prs")
+        inFile <- file.path(WORKSPACE,"work","BMI","LOO",looD,"PRS",inName)
+        gctb_tgp[[looD]] <- read.delim(inFile)
+    }
+    # 2. Average betas
+    betamat <- do.call("cbind",lapply(gctb_tgp,function(x) {
+        return(x$BETA)
+    }))
+    rownames(betamat) <- gctb_tgp[[1]]$SNP
+    avgbeta <- apply(betamat,1,mean,na.rm=TRUE)
+    # 3. Construct and write the consensus
+    gctb_tgp_consensus <- gctb_tgp[[1]]
+    gctb_tgp_consensus$BETA <- avgbeta
+    gctb_tgp_consensus$SE <- 0
+    gctb_tgp_consensus$PIP <- 0.001
+    outFile <- file.path(WORKSPACE,"work","BMI","PRS","final",
+        "b4u_bmi_sbrc_tgp_loo_consensus.prs")
+    write.table(gctb_tgp_consensus,file=outFile,quote=FALSE,sep="\t",
+        row.names=FALSE)
+
+    ## Build GCTB UKB consensus score
+    # 1. Read in cohorts in a list
+    for (looD in dirs) {
+        message("Reading GCTB UKB PRS from ",looD)
+        inName <- paste0("b4u_bmi_sbrc_ukb_",looD,".prs")
+        inFile <- file.path(WORKSPACE,"work","BMI","LOO",looD,"PRS",inName)
+        gctb_ukb[[looD]] <- read.delim(inFile)
+    }
+    # 2. Average betas
+    betamat <- do.call("cbind",lapply(gctb_ukb,function(x) {
+        return(x$BETA)
+    }))
+    rownames(betamat) <- gctb_ukb[[1]]$SNP
+    avgbeta <- apply(betamat,1,mean,na.rm=TRUE)
+    # 3. Construct and write the consensus
+    gctb_ukb_consensus <- gctb_ukb[[1]]
+    gctb_ukb_consensus$BETA <- avgbeta
+    gctb_ukb_consensus$SE <- 0
+    gctb_ukb_consensus$PIP <- 0.001
+    outFile <- file.path(WORKSPACE,"work","BMI","PRS","final",
+        "b4u_bmi_sbrc_ukb_loo_consensus.prs")
+    write.table(gctb_ukb_consensus,file=outFile,quote=FALSE,sep="\t",
+        row.names=FALSE)
+    
+    ## Build PRSCS TGP consensus score
+    # 1. Read in cohorts in a list
+    for (looD in dirs) {
+        message("Reading PRSCS TGP PRS from ",looD)
+        inName <- paste0("b4u_bmi_prscs_tgp_",looD,".prs")
+        inFile <- file.path(WORKSPACE,"work","BMI","LOO",looD,"PRS",inName)
+        prscs_tgp[[looD]] <- read.delim(inFile)
+    }
+    # 2. Average betas
+    betamat <- do.call("cbind",lapply(prscs_tgp,function(x) {
+        return(x$BETA)
+    }))
+    rownames(betamat) <- prscs_tgp[[1]]$SNP
+    avgbeta <- apply(betamat,1,mean,na.rm=TRUE)
+    # 3. Construct and write the consensus
+    prscs_tgp_consensus <- prscs_tgp[[1]]
+    prscs_tgp_consensus$BETA <- avgbeta
+    prscs_tgp_consensus$SE <- 0
+    prscs_tgp_consensus$PIP <- 0.001
+    outFile <- file.path(WORKSPACE,"work","BMI","PRS","final",
+        "b4u_bmi_prscs_tgp_loo_consensus.prs")
+    write.table(prscs_tgp_consensus,file=outFile,quote=FALSE,sep="\t",
+        row.names=FALSE)
+  }'
 ```
 
 ## Notes
