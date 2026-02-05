@@ -376,7 +376,7 @@ gdown 1l3IcA_Y6lfKZ4XYpFuyMPDVMchYPonPN --output b4u_bmi_sbrc_ukb_VUA_out.prs
 gdown 1KENW5OJ0DqBUM1i7breYEt4PHMg3aO9v --output b4u_bmi_prscs_tgp_VUA_out.prs
 ```
 
-### PRS calculation
+### Evaluation and PRS calculation
 
 Calculate baseline PRSs based on the downloaded files for each left-out cohort. 
 We assume that all the covariate files used in fastGWA analysis are placed in 
@@ -505,6 +505,29 @@ write.table(finalMetrics,file=outFile,sep="\t",quote=FALSE,col.names=NA)
 ```
 
 Upload the file `b4u_bmi_prs_metrics_{YOUR_COHORT_NAME}.txt` [here](https://drive.google.com/drive/folders/1ifphpUZJ3aM_mRq29DfHr6fFapClj7Ls?usp=sharing)
+
+### PRS values for federated learning
+
+The actual PRS values must be calculated and included in the federated learning
+of WP5. To this end, export **anonymized** and **truncated** PRS values in a
+single column text file as follows:
+
+```R
+# Write the actual PRS values for each version
+prs_SBRC_TGP <- as.data.frame(round(M_SBRC_TGP$prs,3))
+prs_SBRC_UKB <- as.data.frame(round(M_SBRC_UKB$prs,3))
+prs_PRSCS_TGP <- as.data.frame(round(M_PRSCS_TGP$prs,3))
+
+write.table(prs_SBRC_TGP,file="b4u_bmi_prs_SBRC_TGP.txt",row.names=FALSE,
+    col.names=FALSE,quote=FALSE)
+write.table(prs_SBRC_UKB,file="b4u_bmi_prs_SBRC_UKB.txt",row.names=FALSE,
+    col.names=FALSE,quote=FALSE)
+write.table(prs_PRSCS_TGP,file="b4u_bmi_prs_PRSCS_ORG.txt",row.names=FALSE,
+    col.names=FALSE,quote=FALSE)
+```
+
+The file `b4u_bmi_prs_SBRC_UKB.txt` should be used for the federated learning
+run.
 
 **Thank you in advance**
 
