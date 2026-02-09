@@ -76,7 +76,7 @@ mkdir -p $WORKSPACE/work/PRS/distribute
 
 ### SBayesRC
 
-We follow the instructions at the [SBayesRC](Follow instructions at https://github.com/zhilizheng/SBayesRC) page. A known bug requires downgrading
+We follow the instructions at the [SBayesRC](https://github.com/zhilizheng/SBayesRC) page. A known bug requires downgrading
 (temporarily) the BOOST library headers for R. Also, parallelization does not
 work well in the vanilla version. We created a [fork](https://github.com/pmoulos/SBayesRC)
 that uses the R package `parallel` inspired by another [fork](https://github.com/andrew-terpolovsky/SBayesRC).

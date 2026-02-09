@@ -665,6 +665,8 @@ evalPrs <- function(prsFile,covFile,trait,genoBase,perChr=FALSE,chrs=seq(22),
             prs_pheno_r2_resb=dr2_residb,
             snps_covered=nsnps
         ),
+        null_model=.cleanModel(nullModel),
+        full_model=.cleanModel(fullModel),
         prs=pcovars$PRS
     ))
 }
@@ -808,6 +810,23 @@ cmclapply <- function(...,rc) {
     fin <- c(tmp[1],paste("  --",tmp[2:length(tmp)],sep=""))
     fin[1:(length(fin)-1)] <- paste(fin[1:(length(fin)-1)]," \\\n",sep="")
     return(fin)
+}
+
+.cleanModel <- function(f) {
+    if (is(f,"lm") && !is(f,"glm")) {
+        attr(f$terms,".Environment") <- c()
+        te <- attr(f$model,"terms")
+        attr(te,".Environment") <- c()
+        attr(f$model,"terms") <- te
+    }
+    else if (is(f,"lm") && is(f,"glm")) {
+        attr(f$terms,".Environment") <- c()
+        attr(f$formula,".Environment") <- c()
+        te <- attr(f$model,"terms")
+        attr(te,".Environment") <- c()
+        attr(f$model,"terms") <- te
+    }
+    return(f)
 }
 
 ################################################################################
