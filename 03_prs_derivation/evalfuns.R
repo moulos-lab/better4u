@@ -708,7 +708,7 @@ directR2 <- function(y,prs,nong_covs=NULL,g_covs=NULL,resid_both=FALSE) {
     if (!resid_both)
         return(cor(resid_y,prs[!is.na(resid_y)],use="complete.obs")^2)
     else {
-        fit_prs <- glm(prs~.,data=g_covs,family="gaussian")
+        fit_prs <- glm(prs~.,data=covs,family="gaussian")
         resid_prs <- resid(fit_prs,type="response")
         return(cor(resid_y,resid_prs,use="complete.obs")^2)
     }
