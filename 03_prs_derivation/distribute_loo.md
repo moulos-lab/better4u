@@ -224,7 +224,7 @@ gdown 12O-mB-VIpAiRFDMRoWO68-BH196-h74Z --output b4u_bmi_prscs_tgp_HMGU_out.prs
 
 ```bash
 # b4u_bmi_sbrc_tgp_HUA_out.prs
-gdown 1CLY_hSDPxkT4Mo-51AEmkrKvzl5uCiYn --output b4u_bmi_sbrc_tgp_HUA_out.prs
+gdown 1WVbIGyDOgYJAl_PFtn0H043kG7aPARfm --output b4u_bmi_sbrc_tgp_HUA_out.prs
 
 # b4u_bmi_sbrc_ukb_HUA_out.prs
 gdown 15KwAELxNZZMJvtYpCtGm4BTgTiRJn2PE --output b4u_bmi_sbrc_ukb_HUA_out.prs
@@ -302,7 +302,7 @@ gdown 1AntPLNkh2n-8kz6hxcClCI3thnsZtOkS --output b4u_bmi_prscs_tgp_TAUH_out.prs
 
 ```bash
 # b4u_bmi_sbrc_tgp_UH_out.prs
-gdown 1B-a2HkgqMuMtQxlXjdXj2Z6VJDopoHjV --output b4u_bmi_sbrc_tgp_UH_out.prs
+gdown 1bDfqqv0FuBc5ouUGseefk3KZjvFe5QrK --output b4u_bmi_sbrc_tgp_UH_out.prs
 
 # b4u_bmi_sbrc_ukb_UH_out.prs
 gdown 1gvT2dtRHNnY-igY5V9YL-b3kt2A1FlMD --output b4u_bmi_sbrc_ukb_UH_out.prs
@@ -354,7 +354,7 @@ gdown 1dLQNCwfV5YdStnyTbZWSfHegTn-2XwHI --output b4u_bmi_prscs_tgp_UTARTU_out.pr
 
 ```bash
 # b4u_bmi_sbrc_tgp_VUA_out.prs
-gdown 1_qbOj4r8j3SyHJjR36WHEBViNJjBRwex --output b4u_bmi_sbrc_tgp_VUA_out.prs
+gdown 1Nya1uwpTBfRnGu40xZr_5ZwVCG0hU8Gm --output b4u_bmi_sbrc_tgp_VUA_out.prs
 
 # b4u_bmi_sbrc_ukb_VUA_out.prs
 gdown 1PE935x4AOGCj6zBS-87ZHzXdrNzNO7PD --output b4u_bmi_sbrc_ukb_VUA_out.prs

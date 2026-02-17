@@ -2874,7 +2874,8 @@ Rscript \
         
         rownames(prePrsFile_GCTB_TGP[[looD]]) <- prePrsFile_GCTB_TGP[[looD]]$SNP
         rownames(prePrsFile_GCTB_UKB[[looD]]) <- prePrsFile_GCTB_UKB[[looD]]$SNP
-        rownames(prePrsFile_PRSCS_TGP[[looD]]) <- prePrsFile_PRSCS_TGP[[looD]][,2]
+        rownames(prePrsFile_PRSCS_TGP[[looD]]) <- 
+            prePrsFile_PRSCS_TGP[[looD]][,2]
         colnames(prePrsFile_PRSCS_TGP[[looD]]) <-
             c("CHR","SNP","BP","A1","A2","BETA")
         prePrsFile_PRSCS_TGP[[looD]]$SE <- 0
@@ -2885,9 +2886,15 @@ Rscript \
         snps3[[looD]] <- prePrsFile_PRSCS_TGP[[looD]][,2]
     }
 
-    snps1c <- Reduce("intersect",snps1) # Yields only 55-58% overlap with cohorts
-    snps2c <- Reduce("intersect",snps2) # Yields only 62-65% overlap with cohorts
-    snps3c <- Reduce("intersect",snps3) # Yields >99.9% overlap with cohorts - OK
+    snps1c <- Reduce("intersect",snps1)
+    snps2c <- Reduce("intersect",snps2) 
+    snps3c <- Reduce("intersect",snps3)
+    # Yields only 55-58% overlap with cohorts
+    #round(100*length(snps1c)/sapply(prePrsFile_GCTB_TGP,nrow),2)
+    # Yields only 62-65% overlap with cohorts
+    #round(100*length(snps2c)/sapply(prePrsFile_GCTB_UKB,nrow),2)
+    # Yields >99.9% overlap with cohorts - OK
+    #round(100*length(snps3c)/sapply(prePrsFile_PRSCS_TGP,nrow),2)
 
     ## Build GCTB TGP score files per cohort
 
