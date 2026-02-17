@@ -387,8 +387,13 @@ evalPrs <- function(prsFile,covFile,trait,genoBase,perChr=FALSE,chrs=seq(22),
             fam <- read.table(paste0(genoBase,".sample"),header=TRUE)
         fam <- fam[-1,,drop=FALSE]
     }
-    else
-        fam <- read.table(paste0(genoBase,".fam"))
+    else {
+        if (perChr)
+            fam <- read.table(paste0(genoBase,chrSep,"chr",chrs[1],".fam"))
+        else
+            fam <- read.table(paste0(genoBase,".fam"))
+    }
+        
     rownames(fam) <- fam[,2]
     common <- intersect(rownames(fam),rownames(covars))
     # length(common) can be only smaller or equal to nrow(covars). If smaller, 
@@ -567,6 +572,11 @@ evalPrs <- function(prsFile,covFile,trait,genoBase,perChr=FALSE,chrs=seq(22),
             scoreFile <- paste0(prsName,".profile")
             theScore <- read.table(scoreFile,row.names=2,header=TRUE)
         }
+        
+        scoreCol <- ifelse(bgen,ifelse(sum,"SCORE1_SUM","SCORE1_AVG"),
+            ifelse(sum,"SCORESUM","SCORE"))
+        cc <- ifelse(bgen,"","#")
+        theScore <- data.frame(SCORE=theScore[,scoreCol,drop=FALSE])
     }
 
     # ...and prepare metrics, regressions
