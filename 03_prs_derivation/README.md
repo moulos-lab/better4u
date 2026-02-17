@@ -2911,6 +2911,7 @@ Rscript \
         pr <- intersect(rownames(prePrsFile_GCTB_TGP[[looD]]),snps_1_g5)
         # Absent SNPs
         ab <- setdiff(snps_1_g5,rownames(prePrsFile_GCTB_TGP[[looD]]))
+        message("  ",length(ab)," SNPs fail presence QC in ",looD)
         prdf <- prePrsFile_GCTB_TGP[[looD]][pr,,drop=FALSE]
         f <- snp_info_tgp[ab,c(1,2,5,6),drop=FALSE]
         fill <- cbind(f,0,0,0)
@@ -2931,7 +2932,7 @@ Rscript \
         "snp.info"))
     rownames(snp_info_ukb) <- snp_info_ukb$ID
 
-    # 2. Frequency of all GCTB TGP SNPs - get those in >=5 cohorts
+    # 2. Frequency of all GCTB UKB SNPs - get those in >=5 cohorts
     all_snps_2 <- table(unlist(snps2))
     snps_2_g5 <- names(which(all_snps_2>=5))
 
@@ -2946,6 +2947,7 @@ Rscript \
         pr <- intersect(rownames(prePrsFile_GCTB_UKB[[looD]]),snps_2_g5)
         # Absent SNPs
         ab <- setdiff(snps_2_g5,rownames(prePrsFile_GCTB_UKB[[looD]]))
+        message("  ",length(ab)," SNPs fail presence QC in ",looD)
         prdf <- prePrsFile_GCTB_UKB[[looD]][pr,,drop=FALSE]
         f <- snp_info_ukb[ab,c(1,2,5,6),drop=FALSE]
         fill <- cbind(f,0,0,0)
@@ -2966,7 +2968,7 @@ Rscript \
         "snpinfo_mult_1kg_hm3"))
     rownames(snp_info_prscs) <- snp_info_prscs$SNP
 
-    # 2. Frequency of all GCTB TGP SNPs - get those in >=5 cohorts
+    # 2. Frequency of all PRSCS TGP SNPs - get those in >=5 cohorts
     all_snps_3 <- table(unlist(snps3))
     snps_3_g5 <- names(which(all_snps_3>=5))
 
@@ -2981,15 +2983,18 @@ Rscript \
         pr <- intersect(rownames(prePrsFile_PRSCS_TGP[[looD]]),snps_3_g5)
         # Absent SNPs
         ab <- setdiff(snps_3_g5,rownames(prePrsFile_PRSCS_TGP[[looD]]))
+        message("  ",length(ab)," SNPs fail presence QC in ",looD)
         prdf <- prePrsFile_PRSCS_TGP[[looD]][pr,,drop=FALSE]
         f <- snp_info_prscs[ab,1:5,drop=FALSE]
         if (nrow(f) > 0) {
             fill <- cbind(f,0,0,0)
             names(fill) <- names(prdf)
             prsdf <- rbind(prdf,fill)
-        }       
-        prsdf <- prsdf[order(prsdf$CHR,prsdf$SNP),]
-        
+            prsdf <- prsdf[order(prsdf$CHR,prsdf$SNP),]
+        }
+        else
+            prsdf <- prdf[order(prdf$CHR,prdf$SNP),]
+            
         message("  Writing output")
         outName <- paste0("b4u_bmi_prscs_tgp_",looD,".prs")
         outFile <- file.path(WORKSPACE,"work","BMI","LOO",looD,"PRS",outName)
