@@ -348,9 +348,10 @@ sanitizePrs <- function(prsFile,genoBase,perChr=FALSE,chrs=seq(22),chrSep="_",
 # ukb=TRUE controls ref-first or ref-unknown for PLINK2.
 # If you wish to keep the file with non-mathcing samples to be removed, give a
 # filename to remFile
+# prsId=TRUE if attach sample ids to exported PRS
 evalPrs <- function(prsFile,covFile,trait,genoBase,perChr=FALSE,chrs=seq(22),
     chrSep="_",iidCol=2,sum=TRUE,center=FALSE,bgen=FALSE,ukb=FALSE,remFile=NULL,
-    plink=Sys.which("plink"),plink2=Sys.which("plink2"),rc=NULL) {
+    prsId=FALSE,plink=Sys.which("plink"),plink2=Sys.which("plink2"),rc=NULL) {
     # Determine plink version(s) to use and for what purpose
     proceed <- .informAboutPlinkVersions(plink,plink2,bgen)
     if (!proceed) return()
@@ -659,6 +660,11 @@ evalPrs <- function(prsFile,covFile,trait,genoBase,perChr=FALSE,chrs=seq(22),
     dr2_residb <- directR2(y,prs,nong_covs=nong_covs,g_covs=g_covs,
         resid_both=TRUE)
     
+    # Identify PRS?
+    prs <- pcovars$PRS
+    if (prsId)
+        names(prs) <- rownames(pcovars)
+    
     # Now return an object...
     return(list(
         metrics=c(
@@ -677,7 +683,7 @@ evalPrs <- function(prsFile,covFile,trait,genoBase,perChr=FALSE,chrs=seq(22),
         ),
         null_model=.cleanModel(nullModel),
         full_model=.cleanModel(fullModel),
-        prs=pcovars$PRS
+        prs=prs
     ))
 }
 
