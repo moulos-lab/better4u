@@ -351,7 +351,8 @@ sanitizePrs <- function(prsFile,genoBase,perChr=FALSE,chrs=seq(22),chrSep="_",
 # prsId=TRUE if attach sample ids to exported PRS
 evalPrs <- function(prsFile,covFile,trait,genoBase,perChr=FALSE,chrs=seq(22),
     chrSep="_",iidCol=2,sum=TRUE,center=FALSE,bgen=FALSE,ukb=FALSE,remFile=NULL,
-    prsId=FALSE,plink=Sys.which("plink"),plink2=Sys.which("plink2"),rc=NULL) {
+    prsId=FALSE,outScores=TRUE,plink=Sys.which("plink"),
+    plink2=Sys.which("plink2"),rc=NULL) {
     # Determine plink version(s) to use and for what purpose
     proceed <- .informAboutPlinkVersions(plink,plink2,bgen)
     if (!proceed) return()
@@ -630,12 +631,6 @@ evalPrs <- function(prsFile,covFile,trait,genoBase,perChr=FALSE,chrs=seq(22),
     nullPred <- predict(nullFit,pcovars)
     fullPred <- predict(fullFit,pcovars)
     
-    # RMSE and MAE
-    #nullRmse <- sqrt(sum((nullPred - pcovars[,trait])^2)/nrow(pcovars))
-    #fullRmse <- sqrt(sum((fullPred - pcovars[,trait])^2,
-    #   na.rm=TRUE)/nrow(pcovars))
-    #nullMae <- mean(abs((nullPred - pcovars[,trait])))
-    #fullMae <- mean(abs((fullPred - pcovars[,trait])),na.rm=TRUE)
     nullCor <- cor(nullPred,pcovars[,trait])
     if (any(is.na(fullPred)))
         fullCor <- cor(fullPred,pcovars[,trait],use="complete.obs")
@@ -666,7 +661,7 @@ evalPrs <- function(prsFile,covFile,trait,genoBase,perChr=FALSE,chrs=seq(22),
         names(prs) <- rownames(pcovars)
     
     # Now return an object...
-    return(list(
+    obj <- list(
         metrics=c(
             null_r2=nullR2,
             full_r2=fullR2,
@@ -682,9 +677,12 @@ evalPrs <- function(prsFile,covFile,trait,genoBase,perChr=FALSE,chrs=seq(22),
             snps_covered=nsnps
         ),
         null_model=.cleanModel(nullModel),
-        full_model=.cleanModel(fullModel),
-        prs=prs
-    ))
+        full_model=.cleanModel(fullModel)
+    )
+    if (outScores)
+        obj$prs <- prs
+    
+    return(obj)
 }
 
 # nong_covs: non-genetic covariates, e.g. age, sex etc NO PCs
