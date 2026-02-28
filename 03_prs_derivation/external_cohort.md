@@ -206,6 +206,7 @@ perform only the steps you think are necessary given the status of your cohort.
 
 ### General assumptions
 
+- **The cohort genotypic data are imputed to the HRC r1.1 reference panel**
 - The main file format is PLINK 1.90 binary format
 - Variants are annotated with dbSNP ids
 - Work will be performed with genetic information in autosomes only
@@ -215,6 +216,10 @@ perform only the steps you think are necessary given the status of your cohort.
 - Work is performed in a directory where genetic data files and 
 `bmi_weight_chage_summary_adults.txt` are present
 - `plink` (and `plink2` if required) are in the system's `$PATH`
+
+Imputation to HRC r1.1 is essential for the rest of the process. If HRC r1.1
+data are not available, imputation must be performed prior to continuing with 
+this analysis plan.
 
 In the following, we are working with PLINK 1.90 binary file formats (`.bim + 
 .bed + .fam`). Conversion steps between other indicative formats are provided.
@@ -426,11 +431,16 @@ plink2 \
   --out COHORT_dbmi
 ```
 
-### Basic SNP and sample filtering
+### Basic SNP and sample filtering (optional)
 
-Next we perform filtering with PLINK 1.9 to remove rare variants as well as 
-lower sample and call rates. The following variant filters are recommended but
-they can be changed according to dataset particularities and known behaviour:
+This part is optional as you may already have already performed quality control
+steps which take into account particularities of the dataset. Furthermore, for
+PGS coverage reasons, it may not be useful to filter out variants, even if the
+underlying quality and/or missingness could pose issue. Nevertheless, for
+completeness purposes, we provide basic filtering steps with PLINK 1.9 to remove 
+rare variants as well as samples and variants with lower sample and call rates
+respectively. The following variant filters are recommended but they can be 
+changed according to dataset particularities and known behaviour:
 
 1. Variant call rate: >98%
 2. Minor Allele Frequency: >0.05
@@ -440,10 +450,10 @@ The following sample filters are recommended:
 
 1. Sample call rate: > 95%
 2. Heterozygosity: median(heterozygosity) &plusmn; 3 &times; IQR
-3. KING relatedness: 2nd degree
 
 Below, we sequentially apply variant and sample filters according to widely
 accepted [best practices](https://onlinelibrary.wiley.com/doi/10.1002/sim.6605).
+practice.
 
 First, we calculate heterozygosities:
 
@@ -522,102 +532,67 @@ plink \
   --make-bed
 ```
 
-Kinship analysis is performed with KING (no LD pruning):
+If the above QC steps are not performed, simply create symlinks to the original
+`COHORT` fileset to avoid changing filenames in the steps that follow.
 
 ```bash
-king \
-  -b COHORT_dbmi_filtered.bed \
-  --unrelated \
-  --degree 2 \
-  --prefix individuals_
+ln -s COHORT_dbmi.bed COHORT_dbmi_filtered.bed
+ln -s COHORT_dbmi.fam COHORT_dbmi_filtered.fam
+ln -s COHORT_dbmi.bim COHORT_dbmi_filtered.bim 
 ```
 
-The aforementioned command will create the file `individuals_unrelated.txt` 
-which we use with PLINK to create the dataset with related individuals removed
-(optional).
+### Principal Component projections
+
+In BETTER4U, instead of using local cohort PCs, we have followed a methodology
+where PCA was conducted on data from 1000 genomes project and the produced SNP
+loadings where used to create PC projections of each cohort to the 1000 genomes
+PC space. You can find more about this rationale and the process 
+[here](https://github.com/moulos-lab/better4u/blob/main/01_genetic_data_analysis_plan/pca_process.md). Then, the projections were used as PC covariates in the
+subsequent BETTER4U GWAS. In order to calculate the projections of your cohort
+and include them in the PGS validation model, the following files are provided:
+
+- `pca_variants.txt`: a set of SNPs whose loadings will be used to project your
+local genotypes to 1000 genomes and be used as covariates in subsequent PGS
+validation. It can be downloaded from [here](https://drive.google.com/file/d/1OMjzkbgIwLMivPBkYstLFvO3g4K5DAIk/view?usp=drive_link).
+- `loads_1000g.txt`: the aforementioned loadings. The file can be downloaded 
+from [here](https://drive.google.com/file/d/1mSD9-jc4XK3bE_mgpZ44cSV0YZxUY556/view?usp=drive_link).
+- `means_1000g.txt`: means and standard deviations of the loadings required by
+`flashpca`. The file can be downloaded from [here](https://drive.google.com/file/d/1gL1tqEy0o0f2taExNxAEakGWlNlVijzz/view?usp=drive_link).
+
+In this step the file `pca_variants.txt` will be used in order to create a PLINK
+fileset with a subset of variants contained in this file. Then, this fileset 
+will be used with the files `loads_1000g.txt` and `means_1000g.txt` along with 
+the projection functionality of `flashpca` to create the PC covariates for your
+cohort. The PC projections will be used as covariates in PGS validation.
+
+Firstly, extract the reference allele from `loads_1000g.txt`
+
+```bash
+tail -n +2 loads_1000g.txt | cut -f 1,2 > refpos_1000g.txt
+```
+
+Then, create the PLINK files for PCA projection, switching some alleles if
+necessary:
 
 ```bash
 plink \
   --bfile COHORT_dbmi_filtered \
-  --keep individuals_unrelated.txt \
-  --out COHORT_dbmi_final \
+  --a1-allele refpos_1000g.txt 2 1 \
+  --out COHORT_for_PCA \
+  --extract pca_variants.txt \
   --make-bed
 ```
 
-### LD pruning
-
-Prior to PCA, it is common practice to not use variants in LD, so LD pruning is
-performed.
-
-* `--indep-pairwise [window size] [step size/variant count)] [R2]` controls the 
-pruning parameters. e.g. indep `50 5 0.9` and generates a list of markers in 
-approximate linkage equilibrium - takes 50 SNPs at a time and then shifts by 5 
-for the window. R2 is the cut-off for linkage disequilibrium.
-* We follow an iterative procedure similar to the
-[FinnGen](https://finngen.gitbook.io/documentation/methods/phewas/quality-checks)
-consortium, where R2 is decreased by a constant step until ~200,000 variants are
-included in the pruned set.
-
-```bash
-mkdir pruned
-
-TOTAL=10000000
-R2=0.95
-STEP=0.05
-
-while [ $TOTAL -gt 200000 ]
-do
-  R2=$(echo "$R2-$STEP" | bc)
-  
-  plink \
-    --bfile COHORT_dbmi_final \
-    --indep-pairwise 500 50 $R2 \
-    --out ./pruned/COHORT_dbmi_final
-    
-  TOTAL=$(wc -l ./pruned/*.in | awk '{print $1}')
-  
-  echo "Parameters --indep-pairwise 500 50 $R2 yield $TOTAL SNPs" >> \
-    pruning.log
-done
-```
-
-The final value of `$R2` can be found by:
-
-```bash
-tail -1 pruning.log | awk '{print $(NF-3)}' | sed 's/^\./0./'
-```
-
-We use this value to perform the final pruning:
-
-```bash
-rm -r ./pruned/*
-
-FINAL_R2=`tail -1 pruning.log | awk '{print $(NF-3)}' | sed 's/^\./0./'`
-plink \
-  --bfile COHORT_dbmi_final \
-  --indep-pairwise 500 50 $FINAL_R2 \
-  --out COHORT_dbmi_final_pruned
-
-plink \
-  --bfile COHORT_dbmi_final \
-  --extract COHORT_dbmi_final_pruned.prune.in \
-  --make-bed \
-  --out COHORT_dbmi_final_pruned
-
-rm *.nosex *.log
-```
-
-### Principal Component Analysis with FlashPca2
-
-Perform PCA using FlashPCA2:
+Then, project:
 
 ```
 flashpca \
-  --bfile COHORT_dbmi_final_pruned \
-  --ndim 20 \
-  --outpc pcs_COHORT_dbmi.txt \
-  --outvec eig_COHORT_dbmi.txt \
-  --outload loads_COHORT_dbmi.txt
+  --bfile COHORT_for_PCA \
+  --inmeansd means_1000g.txt \
+  --inload loads_1000g.txt \
+  --project \
+  --outproj projections.txt \
+  --verbose
 ```
 
 ## Phenotypic files with Principal Components
@@ -647,7 +622,7 @@ names(covars)[3] <- "Age"
 covars$AgeSq <- covars$Age^2
 
 # Attach PCs
-pcs <- read.delim("pcs_COHORT_dbmi.txt")
+pcs <- read.delim("projections.txt")
 rownames(pcs) <- pcs$IID
 covars <- covars[rownames(pcs),,drop=FALSE]
 covars10 <- cbind(covars,pcs[,3:12])
@@ -667,7 +642,7 @@ names(covars)[3] <- "Age"
 covars$AgeSq <- covars$Age^2
 
 # Attach PCs
-pcs <- read.delim("pcs_COHORT_dbmi.txt")
+pcs <- read.delim("projections.txt")
 rownames(pcs) <- pcs$IID
 covars <- covars[rownames(pcs),,drop=FALSE]
 covars10 <- cbind(covars,pcs[,3:12])
@@ -707,6 +682,7 @@ source("https://raw.githubusercontent.com/moulos-lab/better4u/refs/heads/main/03
 
 trait <- "BMI_Beta"
 genoBase <- "COHORT_dbmi"
+# or genoBase <- "COHORT_dbmi_filtered" if you prefer to use QCed data
 covFile <- "covariates_dbmi_10pcs.txt"
 
 # PRS-CS with 1000 genomes LD - original version
@@ -778,6 +754,7 @@ source("https://raw.githubusercontent.com/moulos-lab/better4u/refs/heads/main/03
 
 trait <- "Weight_Beta"
 genoBase <- "COHORT_dbmi"
+# or genoBase <- "COHORT_dbmi_filtered" if you prefer to use QCed data
 covFile <- "covariates_dwc_10pcs.txt"
 
 # PRS-CS with 1000 genomes LD - original version
