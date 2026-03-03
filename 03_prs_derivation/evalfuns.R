@@ -161,7 +161,9 @@ sanitizePrs <- function(prsFile,genoBase,perChr=FALSE,chrs=seq(22),chrSep="_",
     pip=0.001,plink2=Sys.which("plink2"),rc=NULL) {
     if (bgen && !(is.character(plink2) || file.exists(plink2))) 
         stop("PLINK 2.0 is required by sanitizePrs() if you have bgen files!")
-        
+    if (!is.character(prsFile) && !file.exists(prsFile))
+        stop("PRS file ",prsFile," does not exist!")
+    
     from <- from[1]
     
     # Basic check, make sure that PLINK or BGEN files exist

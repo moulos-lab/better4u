@@ -108,17 +108,17 @@ and format (tab-delimited):
 | 1 | FID | Family ID |
 | 2 | IID | Individual ID |
 | 3 | N | Number of measurements (N >= 2) |
-| 4 | M_Age | Mean age at measurement |
-| 5 | S_Age | Standard error of age at measurement |
-| 6 | M_BMI | Mean BMI |
-| 7 | S_BMI | Standard error of BMI |
-| 8 | BMI_alpha | Intercept from linear regression `BMI_t ~ alpha + beta * (Age_t - Age_start)` where `Age_start` is the lower bound on age for the category |
-| 9 | BMI_beta | Slope of the linear regression for BMI |
-| 10 | M_Weight | Mean weight |
-| 11 | S_Weight | Standard error of weight |
-| 12 | Weight_alpha | Intercept from linear regression `Weight_t ~ alpha + beta * (Age_t - Age_start)` where `Age_start` is the lower bound on age for the category |
-| 13 | Weight_beta | Slope of the linear regression for weight |
-| 14 | Height_mean | Mean value of reported height measurements |
+| 4 | M_Height | Mean value of reported height measurements |
+| 5 | M_Age | Mean age at measurement |
+| 6 | S_Age | Standard error of age at measurement |
+| 7 | M_BMI | Mean BMI |
+| 8 | S_BMI | Standard error of BMI |
+| 9 | BMI_alpha | Intercept from linear regression `BMI_t ~ alpha + beta * (Age_t - Age_start)` where `Age_start` is the lower bound on age for the category |
+| 10 | BMI_beta | Slope of the linear regression for BMI |
+| 11 | M_Weight | Mean weight |
+| 12 | S_Weight | Standard error of weight |
+| 13 | Weight_alpha | Intercept from linear regression `Weight_t ~ alpha + beta * (Age_t - Age_start)` where `Age_start` is the lower bound on age for the category |
+| 14 | Weight_beta | Slope of the linear regression for weight |
 
 The following R script will read the file `pheno.txt` prepared above and 
 calculate the aforementioned summary statistics:
@@ -129,9 +129,9 @@ d  <- read.delim("pheno.txt")
 nr <- nrow(d)
 
 # Init output variables
-d$N <- d$M_Age <- d$S_Age <- d$M_BMI <- d$S_BMI <- d$BMI_Alpha <- 
+d$N <- d$M_Height <- d$M_Age <- d$S_Age <- d$M_BMI <- d$S_BMI <- d$BMI_Alpha <- 
     d$BMI_Beta <- d$M_Weight <- d$S_Weight <- d$Weight_Alpha <- 
-    d$Weight_Beta <- d$Height_mean <- rep(0,nr)
+    d$Weight_Beta <- rep(0,nr)
 
 for (k in 1:nr) {
     # Split Age, BMI and Weight strings into vectors
@@ -141,10 +141,10 @@ for (k in 1:nr) {
     
     # Calculate mean height from available values
     if (is.numeric(d$Height[k])) # One value only
-        d$Height_mean[k] <- d$Height[k]
+        d$M_Height[k] <- d$Height[k]
     else {
         h <- suppressWarnings(as.numeric(strsplit(d$Height[k],";")[[1]]))
-        d$Height_mean[k] <- mean(h,na.rm=TRUE)
+        d$M_Height[k] <- mean(h,na.rm=TRUE)
     }
 
     # Select time points with BMI information and age in the right interval
@@ -185,7 +185,7 @@ for (k in 1:nr) {
 }
 
 # Save data to file for individuals with >= 2 measurement points
-cols_to_keep <- c("FID","IID","Sex","N","Height_mean","M_Age","S_Age","M_BMI",
+cols_to_keep <- c("FID","IID","Sex","N","M_Height","M_Age","S_Age","M_BMI",
     "S_BMI","M_Weight","S_Weight","BMI_Alpha","BMI_Beta","Weight_Alpha",
     "Weight_Beta")
 d_keep <- d[d$N>=2,cols_to_keep]
@@ -503,7 +503,7 @@ plink \
 We now create files with variants and samples to *keep* (samples to keep are 
 merged with those passing heterozygosity filters):
 
-```r
+```bash
 cut -d" " -f1-2 COHORT_dbmi_tmp.fam > generic_samples_pass.txt
 cut -f2 COHORT_dbmi_tmp.bim > generic_variants_pass.txt
 
@@ -602,7 +602,8 @@ phenotypic files for regression. These include:
 
 - IID
 - Sex
-- Age and Age<sup>2</sup>
+- Age
+- Mean height (`M_Height`) for weight change
 - BMI change slopes (`BMI_Beta`) for BMI change
 - Weight change slopes (`Weight_Beta`) for weight change
 - The first 10 PCs
@@ -612,42 +613,46 @@ methodology.
 
 ### Phenotypic file for BMI change
 
-```r
-# Read and adjust covariates
-covars <- read.delim("bmi_weight_change_summary_adults.txt")
-rownames(covars) <- covars$IID
-cols_keep <- c("IID","Sex","M_Age","BMI_Beta")
-covars <- covars[,cols_keep]
-names(covars)[3] <- "Age"
-covars$AgeSq <- covars$Age^2
+```bash
+Rscript \
+  -e '{
+    # Read and adjust covariates
+    covars <- read.delim("bmi_weight_change_summary_adults.txt")
+    rownames(covars) <- covars$IID
+    cols_keep <- c("IID","Sex","M_Age","BMI_Beta")
+    covars <- covars[,cols_keep]
+    names(covars)[3] <- "Age"
 
-# Attach PCs
-pcs <- read.delim("projections.txt")
-rownames(pcs) <- pcs$IID
-covars <- covars[rownames(pcs),,drop=FALSE]
-covars10 <- cbind(covars,pcs[,3:12])
-write.table(covars10,file="covariates_dbmi_10pcs.txt",sep="\t",quote=FALSE,
-    row.names=FALSE)
+    # Attach PCs
+    pcs <- read.delim("projections.txt")
+    rownames(pcs) <- pcs$IID
+    covars <- covars[rownames(pcs),,drop=FALSE]
+    covars10 <- cbind(covars,pcs[,3:12])
+    write.table(covars10,file="covariates_dbmi_10pcs.txt",sep="\t",quote=FALSE,
+        row.names=FALSE)
+  }'
 ```
 
 ### Phenotypic file for weight change
 
-```r
-# Read and adjust covariates
-covars <- read.delim("bmi_weight_change_summary_adults.txt")
-rownames(covars) <- covars$IID
-cols_keep <- c("IID","Sex","M_Age","Weight_Beta")
-covars <- covars[,cols_keep]
-names(covars)[3] <- "Age"
-covars$AgeSq <- covars$Age^2
+```bash
+Rscript \
+  -e '{
+    # Read and adjust covariates
+    covars <- read.delim("bmi_weight_change_summary_adults.txt")
+    rownames(covars) <- covars$IID
+    cols_keep <- c("IID","Sex","M_Height","M_Age","Weight_Beta")
+    covars <- covars[,cols_keep]
+    names(covars)[3:4] <- c("Height","Age")
 
-# Attach PCs
-pcs <- read.delim("projections.txt")
-rownames(pcs) <- pcs$IID
-covars <- covars[rownames(pcs),,drop=FALSE]
-covars10 <- cbind(covars,pcs[,3:12])
-write.table(covars10,file="covariates_dwc_10pcs.txt",sep="\t",quote=FALSE,
-    row.names=FALSE)
+    # Attach PCs
+    pcs <- read.delim("projections.txt")
+    rownames(pcs) <- pcs$IID
+    covars <- covars[rownames(pcs),,drop=FALSE]
+    covars10 <- cbind(covars,pcs[,3:12])
+    write.table(covars10,file="covariates_dwc_10pcs.txt",sep="\t",quote=FALSE,
+        row.names=FALSE)
+  }'
 ```
 
 ## Assessment of BETTER4U Polygenic Score for Weight Change
