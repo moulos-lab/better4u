@@ -1,4 +1,4 @@
-BETTER4U Task 3.7 script distribution and data collection
+BETTER4U WP3 - Calculation of PRS for weight change for WP5
 ================================================================================
 
 ## Authors
@@ -57,7 +57,7 @@ can be specified, we suggest to keep it to undescore (`_`). You can explore the
 
 ### Calculation of PRS for weight change
 
-1. Download the 5 PRS score files from [here](https://drive.google.com/drive/folders/14mwfzyHly-FSReZbpFojhsiNT6x2ph-f?usp=sharing). The folder contains the following files (with both dbSNP and coordinate based ids):
+1. Download the 5 PRS score files from [here](https://drive.google.com/drive/folders/1r_-12QNEbMiVDDrqBh18nk4TVWhwpuJw?usp=drive_link). The folder contains the following files (with both dbSNP and coordinate based ids):
 
 - `b4u_bmi_prscs_original.prs`: PRS constructed with PRS-CS with built-in EUR 
 1000 genomes panel and a BIM file constructed from the BETTER4U BMI summary
@@ -145,7 +145,7 @@ genoBase <- "COHORT"
 # Covariates file (sex, age, age^2, PCs) and trait
 covFile <- "covariates.txt"
 
-# Assuming this is the BMI name in covariates, otherwise adjust accordingly
+# Assuming the covariate names below, otherwise adjust accordingly
 trait <- "BMI_Beta"
 #trait <- "Weight_Beta"
 
@@ -282,15 +282,21 @@ write.table(prs_SBRC_UKB,file="b4u_bmi_prs_SBRC_UKB.txt",row.names=FALSE,
     col.names=FALSE,quote=FALSE)
 ```
 
-Create an archive with all the produced files to be uploaded:
+Create an archive with all the produced files to be uploaded. Do not include
+scores if you are not allowed by data protection policies.
 
 ```bash
 SITE="YOUR_PARTNER_NAME_HERE_EG_VUA"
+CURRENT_TRAIT="BMI_Beta"
 
-tar -czvf $SITE".tar.gz" b4u_wc_prs_*.txt
+tar -czvf ${SITE}_${CURRENT_TRAIT}".tar.gz" b4u_wc_prs_*.txt
 ```
 
-Upload the file `SITE.tar.gz` [here](https://drive.google.com/drive/folders/1q3Vl0mfvJt4TXKCJUo4KU7vGiaFo0iCj?usp=drive_link)
+Upload the archive [here](https://drive.google.com/drive/folders/1evZjWGAQ-qD8pqSsVNbId_xGt5cNAnjA?usp=sharing)
+
+Repeat the process for `trait <- "Weight_Beta"` (which is commented out in the
+script above). Change also the value of `$CURRENT_TRAIT` when creating the 
+archive to be shared.
 
 ### PRS for federated learning
 
