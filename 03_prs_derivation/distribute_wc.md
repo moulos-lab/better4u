@@ -59,16 +59,16 @@ can be specified, we suggest to keep it to undescore (`_`). You can explore the
 
 1. Download the 5 PRS score files from [here](https://drive.google.com/drive/folders/1r_-12QNEbMiVDDrqBh18nk4TVWhwpuJw?usp=drive_link). The folder contains the following files (with both dbSNP and coordinate based ids):
 
-- `b4u_bmi_prscs_original.prs`: PRS constructed with PRS-CS with built-in EUR 
+- `b4u_wc_prscs_original.prs`: PRS constructed with PRS-CS with built-in EUR 
 1000 genomes panel and a BIM file constructed from the BETTER4U BMI summary
 statistics
-- `b4u_bmi_prscs_robust.prs`: PRS-CS with built-in EUR 1000 genomes panel and 
+- `b4u_wc_prscs_robust.prs`: PRS-CS with built-in EUR 1000 genomes panel and 
 robust SNP set after bootstrap and original PRS-CS betas
-- `b4u_bmi_prscs_recalibrated.prs`: PRS-CS with built-in EUR 1000 genomes panel,
+- `b4u_wc_prscs_recalibrated.prs`: PRS-CS with built-in EUR 1000 genomes panel,
 robust SNP set and recalibrated betas with PRS-CS
-- `b4u_bmi_sbrc_tgp.prs`: GCTB SBayesRC with custom LD panel from 1000 genomes 
+- `b4u_wc_sbrc_tgp.prs`: GCTB SBayesRC with custom LD panel from 1000 genomes 
 EUR samples
-- `b4u_bmi_sbrc_ukb.prs`: GCTB SBayesRC with built-in UKB LD panel
+- `b4u_wc_sbrc_ukb.prs`: GCTB SBayesRC with built-in UKB LD panel
 
 If you have [gdown](https://github.com/wkentaro/gdown) installed:
 
@@ -187,11 +187,11 @@ sanFile_SBRC_UKB <- sanitizePrs(prsFile_SBRC_UKB,genoBase,from="sbayesrc")
 #   from="sbayesrc",rc=0.2)
 
 # Five files are written:
-# b4u_bmi_prscs_original.prs.san
-# b4u_bmi_prscs_robust.prs.san
-# b4u_bmi_prscs_recalibrated.prs.san
-# b4u_bmi_sbrc_tgp.prs.san
-# b4u_bmi_sbrc_ukb.prs.san
+# b4u_wc_prscs_original.prs.san
+# b4u_wc_prscs_robust.prs.san
+# b4u_wc_prscs_recalibrated.prs.san
+# b4u_wc_sbrc_tgp.prs.san
+# b4u_wc_sbrc_ukb.prs.san
 
 # Then feed to the PRS/metrics function calculation
 # Single PLINK file:
@@ -260,7 +260,7 @@ colnames(add) <- names(metrics)
 # Final metrics data frame
 finalMetrics <- rbind(metrics,add)
 
-write.table(finalMetrics,file="b4u_bmi_prs_metrics.txt",sep="\t",
+write.table(finalMetrics,file="b4u_wc_prs_metrics.txt",sep="\t",
     quote=FALSE,col.names=NA)
 
 # Now write the actual PRS values for each version
@@ -270,15 +270,15 @@ prs_PRSCS_REC <- as.data.frame(round(M_PRSCS_REC$prs,3))
 prs_SBRC_TGP <- as.data.frame(round(M_SBRC_TGP$prs,3))
 prs_SBRC_UKB <- as.data.frame(round(M_SBRC_UKB$prs,3))
 
-write.table(prs_PRSCS_ORG,file="b4u_bmi_prs_PRSCS_ORG.txt",row.names=FALSE,
+write.table(prs_PRSCS_ORG,file="b4u_wc_prs_PRSCS_ORG.txt",row.names=FALSE,
     col.names=FALSE,quote=FALSE)
-write.table(prs_PRSCS_ROB,file="b4u_bmi_prs_PRSCS_ROB.txt",row.names=FALSE,
+write.table(prs_PRSCS_ROB,file="b4u_wc_prs_PRSCS_ROB.txt",row.names=FALSE,
     col.names=FALSE,quote=FALSE)
-write.table(prs_PRSCS_REC,file="b4u_bmi_prs_PRSCS_REC.txt",row.names=FALSE,
+write.table(prs_PRSCS_REC,file="b4u_wc_prs_PRSCS_REC.txt",row.names=FALSE,
     col.names=FALSE,quote=FALSE)
-write.table(prs_SBRC_TGP,file="b4u_bmi_prs_SBRC_TGP.txt",row.names=FALSE,
+write.table(prs_SBRC_TGP,file="b4u_wc_prs_SBRC_TGP.txt",row.names=FALSE,
     col.names=FALSE,quote=FALSE)
-write.table(prs_SBRC_UKB,file="b4u_bmi_prs_SBRC_UKB.txt",row.names=FALSE,
+write.table(prs_SBRC_UKB,file="b4u_wc_prs_SBRC_UKB.txt",row.names=FALSE,
     col.names=FALSE,quote=FALSE)
 ```
 
